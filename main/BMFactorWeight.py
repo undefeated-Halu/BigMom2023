@@ -19,28 +19,21 @@ Edited on Fri Nov 17 21:33:00 2023
 @author: oOoOo_Andra
 """
 
-root_path = 'D:/ProgramFiles/python/'
+root_path = 'D:/ProgramFiles/python/strategy_factor/BigMom2023/'
 
 root_data = 'D:/Data/'
 
-path_lib = f'{root_path}BASE/'
-
-path_strategy = f'{root_path}strategy_factor/BigMom2023/'
-
 import pandas as pd
 import numpy as np
-import os
-os.chdir(path_strategy)
-#import time
-import sys
-sys.path.append('D:/Data/factorFunda/')
-sys.path.append(path_lib)
-# sys.path.append(path_strategy)
+# import os
+# os.chdir(root_path)
 import yaml
+import sys
+sys.path.append(f'{root_path}main')
 # import ctaBasicFunc as cta
 # from datetime import datetime
 import matplotlib.pyplot as plt
-import BigMomWTS_2309 as bm
+import BigMomWTS as bm
 import FactorModelingFunctions as bmModel
 import FactorBaseFunctions as bmBase
 import scipy.optimize as sco
@@ -48,7 +41,7 @@ import scipy.optimize as sco
 import warnings
 warnings.filterwarnings(action="ignore", message="^internal gelsd")
 
-with open('config_BigMom2023.yml', 'r', encoding='utf-8') as parameters:
+with open('config/config_BigMom2023.yml', 'r', encoding='utf-8') as parameters:
     configFile = yaml.safe_load(parameters)
 
 paramsBank = configFile['params']
@@ -138,7 +131,7 @@ for i in range(len(df_factorPools)):
 # 统一index格式
 df_f_rets.index = pd.to_datetime(df_f_rets.index, format='%Y-%m-%d')
 df_f_ic.index = pd.to_datetime(df_f_ic.index, format='%Y-%m-%d')
-factor_signal.index = pd.to_datetime(factor_signal.index, format='%Y-%m-%d')
+# df_f_signals.index.levels[0] = pd.to_datetime(factor_signal.index.levels[0], format='%Y-%m-%d')
 
 
 #%% 因子组合

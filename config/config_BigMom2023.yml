@@ -100,7 +100,7 @@ path:
     
     filepath_factorsF: 'D:/Data/factorFunda/dataset/wts_factors&returns_Funda.h5'
     
-    filepath_factorTable2023: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/factorTable2023.xlsx'
+    filepath_factorTable2023: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/config/factorTable2023.xlsx'
     
     filepath_factorPools: 'D:/ProgramFiles/Strategy/BigMom2023/factorPools.xlsx'
     
