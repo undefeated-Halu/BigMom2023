@@ -98,8 +98,53 @@ def opt_stats(weights,daily_profit):
     pvol = np.sqrt(np.dot(weights.T, np.dot(daily_profit.cov() * 252, weights)))
     return pret,pvol,pret/pvol
 
-def min_sp(daily_profit,weights):
-    return -opt_stats(daily_profit,weights)[2]
+def max_sp(weights, daily_profit):
+    weights = np.array(weights)
+    
+    portfolio_return = np.sum(daily_profit.mean() * weights) * 252
+    
+    portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(daily_profit.cov() * 252, weights)))
+
+    return -portfolio_return/portfolio_volatility
+
+
+def max_sortino(weights,daily_profit):
+    '''
+    weights: np.array
+    daily_profit: DataFrame
+    '''
+    weights = np.array(weights)
+    
+    portfolio_return = np.sum(daily_profit.mean() * weights) * 252
+    
+    # r_p_min = np.sum(daily_profit[daily_profit < 0].mean() * weights) * 252
+    
+    # 下行标准差
+    portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(np.minimum(daily_profit, 0).cov() * 252, weights)))
+    
+    return -portfolio_return / portfolio_volatility
+
+def min_volatility(weights,daily_profit):
+    weights = np.array(weights)
+    
+    portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(daily_profit.cov() * 252, weights)))
+    
+    return portfolio_volatility
+
+def max_upside_volatility(weights,daily_profit):
+    weights = np.array(weights)
+    
+    portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(np.maximum(daily_profit, 0).cov() * 252, weights)))
+    
+    return -portfolio_volatility
+
+def min_downside_volatility(weights,daily_profit):
+    weights = np.array(weights)
+    
+    portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(np.minimum(daily_profit, 0).cov() * 252, weights)))
+    
+    return portfolio_volatility
+
 
 
 #%% 收益计算
