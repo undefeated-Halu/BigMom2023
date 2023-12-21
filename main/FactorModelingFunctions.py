@@ -12,6 +12,12 @@ Edited on Wed Nov  8 09:41:04 2023
 import pandas as pd
 import numpy as np
 import scipy.optimize as sco
+import cvxpy as cp
+import BigMomWTS as bm
+import FactorBaseFunctions as bmBase
+
+from datetime import datetime
+
 import bottleneck as bn
 #%% 过滤
 def factor_filter(corr_df, threshold = 0.6):
@@ -132,6 +138,7 @@ def min_volatility(weights,daily_profit):
     return portfolio_volatility
 
 def max_upside_volatility(weights,daily_profit):
+    '''我觉得这个上行波动率有点反智'''
     weights = np.array(weights)
     
     portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(np.maximum(daily_profit, 0).cov() * 252, weights)))
@@ -145,7 +152,181 @@ def min_downside_volatility(weights,daily_profit):
     
     return portfolio_volatility
 
+def min_volatility_cvx(df_rets_slice: pd.DataFrame, n: int, maxW: float = 1.0):
+    """
+    minimum portfolio risk optimazation using cvxpy
 
+    Parameters
+    ----------
+    df_rets_slice : pd.DataFrame
+        underlying factors/assets/tickers daily returns
+    n : int
+        number of assets
+    maxW : float, optional
+        maximum weight of signle assets. 
+        The default is 1.
+
+    Returns
+    -------
+    np.array
+        assets' weight array
+
+    """
+    covariance_matrix = df_rets_slice.cov().values
+    # 使用 cvxpy.psd_wrap() 处理协方差矩阵
+    covariance_matrix = cp.psd_wrap(covariance_matrix)
+    # 定义变量和目标函数
+    weights = cp.Variable(n)
+    
+    portfolio_volatility = cp.quad_form(weights, covariance_matrix)
+    
+    # 定义约束条件
+    constraints = [cp.sum(weights) == 1, weights >= 0, cp.max(weights) <=maxW]
+    # constraints = [cp.sum(weights) == 1, weights >= 0, weights <=maxW]
+    
+    # 定义问题并求解
+    problem = cp.Problem(cp.Minimize(portfolio_volatility), constraints)
+    
+    problem.solve()    
+    
+    return weights.value
+
+def max_adjustedReturn_cvx(df_rets_slice: pd.DataFrame, n: int,  maxW: float = 1.0):
+    """
+    maximum portfolio Sharpe Ratio optimazation using cvxpy
+
+    Parameters
+    ----------
+    df_rets_slice : pd.DataFrame
+        underlying factors/assets/tickers daily returns
+    n : int
+        number of assets
+    maxW : float, optional
+        maximum weight of signle assets. 
+        The default is 1.
+
+    Returns
+    -------
+    np.array
+        assets' weight array
+
+    """
+
+    covariance_matrix = df_rets_slice.cov().values
+    
+    # 使用 cvxpy.psd_wrap() 处理协方差矩阵
+    covariance_matrix = cp.psd_wrap(covariance_matrix)
+    
+    # 定义变量和目标函数
+    weights = cp.Variable(n)
+    
+    # 定义约束条件
+    constraints = [cp.sum(weights) == 1, weights >= 0, cp.max(weights) <=maxW]
+    
+    # 组合预期收益
+    portfolio_return = df_rets_slice.mean().values @ weights
+    
+    # 组合风险  
+    portfolio_volatility = cp.quad_form(weights, covariance_matrix)
+    
+    # 定义问题并求解
+    objective = cp.Maximize(portfolio_return - portfolio_volatility)
+    
+    problem = cp.Problem(objective, constraints)
+    
+    problem.solve()
+    
+    return weights.value
+
+def min_downside_volatility_cvx(df_rets_slice: pd.DataFrame, n: int,  maxW: float = 1.0):
+    """
+    minimum portfolio downside_volatility optimazation using cvxpy
+
+    Parameters
+    ----------
+    df_rets_slice : pd.DataFrame
+        underlying factors/assets/tickers daily returns
+    n : int
+        number of assets
+    maxW : float, optional
+        maximum weight of signle assets. 
+        The default is 1.
+
+    Returns
+    -------
+    np.array
+        assets' weight array
+
+    """
+    covariance_matrix = np.minimum(df_rets_slice, 0).cov().values
+
+    # 使用 cvxpy.psd_wrap() 处理协方差矩阵
+    covariance_matrix = cp.psd_wrap(covariance_matrix)
+    
+    # 定义变量和目标函数
+    weights = cp.Variable(n)
+    
+    # 定义约束条件
+    constraints = [cp.sum(weights) == 1, weights >= 0, cp.max(weights) <=maxW]
+    
+    # 组合风险  
+    portfolio_volatility = cp.quad_form(weights, covariance_matrix)
+    
+    # 定义问题并求解
+    problem = cp.Problem(cp.Minimize(portfolio_volatility), constraints)
+    
+    problem.solve()
+    
+    return weights.value
+
+def max_upside_volatility_cvx(df_rets_slice: pd.DataFrame, n: int,  maxW: float = 1.0):
+    """
+    目标函数 非凸， 无法运行
+    
+    
+    minimum portfolio downside_volatility optimazation using cvxpy
+
+    Parameters
+    ----------
+    df_rets_slice : pd.DataFrame
+        underlying factors/assets/tickers daily returns
+    n : int
+        number of assets
+    maxW : float, optional
+        maximum weight of signle assets. 
+        The default is 1.
+
+    Returns
+    -------
+    np.array
+        assets' weight array
+
+    """
+    covariance_matrix = np.maximum(df_rets_slice, 0).cov().values
+
+    # 使用 cvxpy.psd_wrap() 处理协方差矩阵
+    covariance_matrix = cp.psd_wrap(covariance_matrix)
+    
+    # 定义变量和目标函数
+    weights = cp.Variable(n)
+    
+    # 定义约束条件
+    constraints = [cp.sum(weights) == 1, weights >= 0, cp.max(weights) <=maxW]
+    
+    # 组合风险  
+    portfolio_volatility = cp.quad_form(weights, covariance_matrix)
+    
+    # 定义问题并求解
+    problem = cp.Problem(cp.Minimize(-portfolio_volatility), constraints)
+    
+    problem.solve()
+    
+    return weights.value
+
+
+def average_weight(df_rets_slice: pd.DataFrame, n: int,  maxW: float = 1.0):
+    return pd.Series(1/n, index=df_rets_slice.columns)
+        
 
 #%% 收益计算
 def calc_return(dfweight, ret, jumpRet, dfcost, reweight=True):
@@ -165,9 +346,6 @@ def calc_return(dfweight, ret, jumpRet, dfcost, reweight=True):
     
     cumret = dfret.sum(axis=1).cumsum()
     return dfret, cumret, dfweight2
-        
-
-
    
 def calc_return2(dfweight, ret, jumpRet, dfcost, th=0.1):
     '''
@@ -188,10 +366,97 @@ def calc_return2(dfweight, ret, jumpRet, dfcost, th=0.1):
     cumret = dfret.sum(axis=1).cumsum()
     return dfret, cumret
 
-
+#%% 实盘因子生产
+def factorGenerator(df_factorPools, price, rets, forward_return, cost,
+                    trade_cols, filepath_factorPools, timeConsumption=20):  
+    
+    # df_factorPools['timeConsumption'] = 0
+    if timeConsumption:
+        df_factorPools['tag_trade'] = (df_factorPools['timeConsumption'] < timeConsumption) & (df_factorPools['tag_test'])
+    
+    print(f'''{df_factorPools['tag_trade'].sum()} factors in total!''')
+    #--- 生成
+    wts = bm.WTS_factor(price, trade_cols)
+    
+    # factor returns with trade costs
+    
+    df_f_rets = pd.DataFrame(rets.index, columns=df_factorPools.loc[df_factorPools['tag_trade'],'testCode'])
+    # df_f_ic = pd.DataFrame(rets.index, columns=df_factorPools['testCode'])
+    df_f_signals = pd.DataFrame()
+    df_f = pd.DataFrame()
+    
+    
+    for i in range(len(df_factorPools)):
+                
+        if df_factorPools.tag_trade[i] :
+            
+            factorName = df_factorPools.index[i]
+            try:
+                paramSet = eval(df_factorPools.param[i])
+        
+                param = paramSet[:-1]
+        
+                hp = paramSet[-1]
+                #---1 计算因子
+                a = datetime.now()
+                
+                factor = eval(f'wts.{factorName}{param}')
+                
+                df_factorPools.iloc[i,-1]  = (datetime.now() - a).seconds
+                
+                #---2 因子处理
+                if factor is None:
+                    print(param, i ,' invalid parameters!')
+                    df_factorPools.iloc[i, 0] = False # tag_test=False
+        
+                else:
+                    # 调用因子处理函数
+                    print(factorName)
+                    factor = bmBase.WTS_factor_handle(factor, nsigma=3)
+                    # 预期收益
+                    # forward_return = forward_returns.xs(f'{hp}D', level='hp')
+        
+                #---3 单参数测试
+                    df_f_rets[i], _, factor_signal = bmBase.factor_test_single(factor, rets, forward_return, cost, groupNum=5, groupInd=1, hp=hp)
+        
+                    factor_signal['factor'] = i
+        
+        
+                    df_f_signals = pd.concat([df_f_signals, factor_signal])
+        
+                    factor['factor'] = i
+                    df_f = pd.concat([df_f, factor])
+                    
+            except:
+                print(f'{factorName} is not valid')
+                df_factorPools.iloc[i, 0] = False
+    
+    #--- trim data
+    # 统一index格式
+    df_f_rets.index = pd.to_datetime(df_f_rets.index, format='%Y-%m-%d')
+    
+    df_f_rets = df_f_rets.replace([np.inf,-np.inf], 0).fillna(0)
+    
+    # df_f_ic.index = pd.to_datetime(df_f_ic.index, format='%Y-%m-%d')
+    # df_f_signals.index.levels[0] = pd.to_datetime(factor_signal.index.levels[0], format='%Y-%m-%d')
+    
+    df_f_signals.set_index('factor', append=True, inplace=True)
+    
+    df_f.set_index('factor', append=True, inplace=True)
+    
+    #--- 保存文件
+    df_f_rets.to_csv('data/factorsDailyRet.csv')
+    
+    df_f_signals.to_csv('data/factorsDailySignal.csv')
+    
+    df_f.to_csv('data/factors.csv')
+    
+    df_factorPools.to_excel(filepath_factorPools)
+    
+    return df_f_rets, df_f_signals
         
 #%% 权重输出
-def signal_generator(weight: pd.Series, factors_signal_all: pd.DataFrame):
+def signal_generator_backtest(weight: pd.Series, factors_signal_all: pd.DataFrame):
     '''
 
     Parameters
@@ -242,7 +507,18 @@ def signal_generator(weight: pd.Series, factors_signal_all: pd.DataFrame):
         
     return signal
 
-
+def signal_generator_real(weight: pd.Series, df_f_signals: pd.DataFrame, index, columns):
+    
+    signal = pd.DataFrame(0, index=index, columns=columns)
+     
+    for i in weight.index:
+        # print(i)
+        
+        signal += df_f_signals.xs(int(i), level=1) * weight.loc[i]
+    
+    signal = signal.div(signal.abs().sum(axis=1), axis=0)
+    
+    return signal
 
 
 def weightReconstrution(dfpos_longshort1,dfgroupII,groupWeightTh=0.2, mode='spread'):
@@ -279,17 +555,17 @@ def weightReconstrution(dfpos_longshort1,dfgroupII,groupWeightTh=0.2, mode='spre
             
     return dfposG2
 
-def output_position(dfweightMsr, capital, future_info, prices, fileName,
+def output_position(weight, capital, future_info, price, fileName,
                     filepath_templete, filepath_tradePosition):
-    cols = dfweightMsr.columns
+    cols = weight.columns
     
     point = future_info.loc[cols, 'point']
     
     min_lots = future_info.loc[cols, 'minTradeLots']
     
-    dfcap = prices[cols] * point * min_lots
+    dfcap = price[cols] * point * min_lots
     
-    dflots = (capital * dfweightMsr / dfcap).fillna(0).round() * min_lots
+    dflots = (capital * weight / dfcap).fillna(0).round() * min_lots
     
     position = pd.read_csv(filepath_templete)
     
@@ -312,14 +588,8 @@ def output_position(dfweightMsr, capital, future_info, prices, fileName,
     position.to_csv(f'{filepath_tradePosition}{fileName}',index=False)
     
     
-    outputCap = dflots * prices[cols] * point
+    outputCap = dflots * price[cols] * point
 
-    print(f"""position files generated @ {filepath_tradePosition}{fileName}""")
-    
-    print(f"""total position = {round(outputCap.abs().sum(axis=1)[-1]/1000000,2)}unit""")
-    print(f"""net exposure = {round(outputCap.sum(axis=1)[-1]/1000000,2)}unit""")
-    
-    print('#' * 40)
 
     
     return outputCap

@@ -15,8 +15,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 import seaborn as sns
+import yaml
+# import BigMomWTS as bm
+from datetime import datetime
 
-#%% 标准化函数：
+#%% 因子清洗
+def WTS_factor_handle(factor, nsigma=3):
+    #-----2.1 标准化（正态）
+    factor = filter_extreme_normalize(factor, axis='columns', method=2)
+    #-----2.2 处理缺失值
+    factor = factor.fillna(method='ffill')
+    #-----2.3 处理异常值（3sigma）
+    factor[factor > nsigma] = nsigma 
+    factor[factor < -nsigma] = -nsigma
+    return factor
+
+
 def standardize_ts(s,ty=2):
     '''
     请使用filter_extreme_normalize
@@ -418,7 +432,8 @@ def cal_cost2(data, future_list,capital, slip=-1):
     return fee
 
 
-def factor_test_group(factor, rets, cost, groupNum=5, h=5,  factorName='factor', fig=True, fig_path='C:/desktop/'):
+def factor_test_group(factor, rets, cost, groupNum=5, h=5,  factorName='factor',
+                      fig=True, fig_path='C:/desktop/'):
     '''
     23Oct16
         增加成本的计算
@@ -606,8 +621,11 @@ def factor_test_single(factor: pd.DataFrame, rets: pd.DataFrame, forward_return:
         factor_return = (pos.shift() * rets - fee).sum(axis=1).div(lots, axis=0)
             
         # factors information coefficiency
-        factor_ic = factor_signal.corrwith(forward_return,axis=1)
-
+        # factor_ic = factor_signal.corrwith(forward_return,axis=1)
+        try:
+            factor_ic = factor_signal.corrwith(forward_return.xs(f'{hp}D',level=1),axis=1)
+        except:
+            factor_ic = 0
         return factor_return, factor_ic, pos
 
 
@@ -695,7 +713,191 @@ def factor_test_all(factors: pd.DataFrame, rets: pd.DataFrame, groupNum: int,
     return factors_return_all, factors_ic_all, factors_signal
 
 
+#%% 策略运行
+
+def load_config(filepath='config/config_BigMom2023.yml'):
+    with open(filepath, 'r', encoding='utf-8') as parameters:
+        configFile = yaml.safe_load(parameters)
+    
+    paramsBank = configFile['params']
+    
+    pathBank = configFile['path']
+    
+    pathFactor_weight = configFile['factor_weight']
+    
+    globals().update(paramsBank['basic'])
+    
+    globals().update(pathBank)
+    
+    globals().update(pathFactor_weight)
+    
+    print('load globals variables')
 
 
 
+def load_basic_info(filepath_future_list, filepath_factorTable2023, method='trade'):
+    ### 1 基础信息表
+    # 期货列表，基础信息表
+    future_info = pd.read_csv(filepath_future_list,index_col=0)
+    
+    # F和PV都交易的品种，基础信息表里用tradeF列标识
+    trade_cols = future_info[future_info[method].fillna(False)].index.tolist()
+    
+    # BigMom2023的factorTable
+    df_factorTable = pd.read_excel(filepath_factorTable2023, index_col=0)
+    
+    list_factor_test = df_factorTable[df_factorTable.tag_test == 1].index.tolist()
+    
+    return future_info, trade_cols, list_factor_test, df_factorTable
+
+def load_local_data(filepath_index, filepath_factorsF, future_info, 
+                    trade_cols,start_date, end_date):
+    ### 2 品种指数日数据
+    print('load loca data......')
+    print(f'start_date: {start_date}')
+    print(f'end_date: {end_date}')
+    # 品种指数数据，根据本地落地的1分钟数据生成的日数据，按照时间串行存储，通过code字段标记
+    '''
+                      open       high        low  ...  barsID    pctChg  code
+    tradingday                                   ...                        
+    2012-05-10   6190.000   6193.000   6082.000  ...       0  0.000000    AG
+    2012-05-11   6110.000   6114.000   6001.000  ...       1 -0.022476    AG
+    2012-05-14   6040.000   6045.000   5960.000  ...       2 -0.004332    AG
+    '''
+    
+    price = pd.read_csv(filepath_index, index_col=0, parse_dates=True)
+    
+    price.sort_index(inplace=True)
+    
+    price = price[start_date : ]
+    
+    # 交易成本
+    # 把品种乘数先当到表里
+    price = price.merge(future_info.loc[trade_cols, ['point','type','commission']], 
+                        left_on='code', right_index=True)
+    # 手续费
+    price['fee'] = np.where(price['type']==0, price['commission']/price.close/price.point,
+                             price['commission'])
+    # 总交易成本（跳空损益+手续费）
+    price['cost'] = price['open'] / price['pre_close'] - 1 + price['fee']
+    # 通过vwap和volume计算amount
+    price['amount'] = price.avg * price.volume
+    # 计算市值
+    price['mkt_value'] = price.close * price.oi * price.point
+    ## 后面几步是为了和之前的数据结构统一
+    price.set_index('code',append=True, inplace=True)
+    # 先把品种放回到列上，然后再把列上olhc字段放到index上。实现较为清晰的数据结构
+    price = price.unstack(1).stack(0) 
+    
+    '''
+    code                             A            AG  ...  ZC            ZN
+    tradingday                                        ...                  
+    2010-01-04 amount     1.309526e+09           NaN  ... NaN  8.155711e+09
+               avg        4.068899e+03           NaN  ... NaN  2.150779e+04
+               barsID     0.000000e+00           NaN  ... NaN  0.000000e+00
+               close      4.057000e+03           NaN  ... NaN  2.143500e+04
+               high       4.089000e+03           NaN  ... NaN  2.172000e+04
+                               ...           ...  ...  ..           ...
+    2023-07-13 oi         1.972420e+05  8.639010e+05  ... NaN  2.066940e+05
+    '''
+    
+    ### 3 品种主力数据
+    
+    #--- 3.1 通过原quote2生成
+    # =============================================================================
+    # df_MS_sp = pd.read_csv(filepath_mainsub, index_col='date',parse_dates=True)[start_date:end_date]
+    # df_main_all = df_MS_sp[df_MS_sp.type == 'main']
+    # df_main_all.loc[:,'pctChg'] = df_main_all.close / df_main_all.pre_close - 1
+    # df_main_all.loc[:,'jump'] = df_main_all.open / df_main_all.pre_close - 1
+    # 
+    # df_main_ret = df_main_all[['product','pctChg']].set_index(['product'],append=True).unstack(level=1)
+    # df_main_ret = df_main_ret.droplevel(level=0, axis='columns')
+    # df_main_ret.sort_index(inplace=True)
+    # 
+    # =============================================================================
+    #--- 3.2 直接从h5文件读取
+    trade_cols2 = future_info[future_info['tradeF'].fillna(False)].index.tolist()
+    df_main_ret = pd.read_hdf(filepath_factorsF, key='returns')[trade_cols2][start_date : ]
+    
+    ### 4 生成实例
+    # wts = WTS_factor(price, trade_cols)
+    
+    # ### 3 品种指数收益和主力合约收益
+    # retIndex = wts.CLOSE.pct_change().fillna(0)
+    
+    retIndex = price.loc[(slice(None), 'close'), :].droplevel(1)[trade_cols].pct_change().fillna(0)
+    
+    retMain = df_main_ret
+    
+    ### 5手续费
+    cost = price.loc[(slice(None), 'cost'), :].droplevel(1)[trade_cols].shift(-1).fillna(0)
+    
+    # 以指数长度为基准对齐主力收益
+    temp = pd.DataFrame(1, index=retIndex.index, columns=['temp'])
+    retMain = pd.merge(temp, retMain, how='left', left_index=True, right_index=True)[trade_cols2].fillna(0)
+        
+    return price, retIndex, retMain, cost
+
+def trim_length(retMain, retIndex):
+    temp = pd.DataFrame(1, index=retIndex.index, columns=['temp'])
+    retMain = pd.merge(temp, retMain, how='left', left_index=True, right_index=True)
+    return retMain.iloc[:,1:]
+
+def load_factorPools(filepath_factorPools):
+    
+    df_factorPools = pd.read_excel(filepath_factorPools, index_col=0)
+    
+    # df_factorPools = df_factorPools[df_factorPools.tag_test]
+    
+    df_factorPools['testCode'] = range(len(df_factorPools))
+    
+    df_factorPools['hp'] = df_factorPools.param.apply(lambda x: eval(x)[-1])
+    
+    periods = df_factorPools['hp'].unique()
+    
+    print(f'''factorPools长度： {df_factorPools.shape[0]}''')
+    
+    return df_factorPools, periods
+
+
+#%% 辅助函数
+def get_cal_date(filepath_cal_date):
+    import tushare as ts
+    pro = ts.pro_api('c9aa112130d488a5b336cde159a2c821cfd9d09bd3bacc939edb6bee')
+    
+    # today = date.today()
+        
+    cal_date = pro.trade_cal()
+    
+    cal_date = cal_date[::-1]
+    
+    cal_date.index = pd.to_datetime(cal_date.cal_date.values)
+    
+    cal_date = cal_date['2016':]
+    
+    cal_date.to_csv(filepath_cal_date)
+    
+    print(f'''cal_date csv is saved @ {filepath_cal_date}''')
+    
+    return cal_date
+
+def get_rebalance_date(filepath_cal_date : str, dateNum: int = 20):
+    from datetime import date
+    
+    try:
+        cal_date = pd.read_csv(filepath_cal_date, index_col=0, parse_dates=True)
+        
+    except Exception as e:
+        print(e)
+    
+    if cal_date.index[-1].date() < date.today():
+        cal_date = get_cal_date(filepath_cal_date)
+    
+    if 'is_open'  in cal_date.columns:
+        cal_date['rebalance_date'] = (cal_date.is_open.cumsum().mod(dateNum) == 0 ) & (cal_date.is_open == 1)
+    
+    else:
+        cal_date['rebalance_date'] = ( (np.arange(len(cal_date)) ) % (dateNum) == 0 ) 
+    
+    return cal_date
 

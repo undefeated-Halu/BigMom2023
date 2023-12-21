@@ -43,18 +43,14 @@ import sys
 sys.path.append('D:/Data/factorFunda/')
 sys.path.append(path_lib)
 import bottleneck as bn
-from FactorCalcFunctions import *
-from FactorBaseFunctions import *
+from main.FactorCalcFunctions import *
+from main.FactorBaseFunctions import *
 import yaml
 import ctaBasicFunc as cta
 import itertools
 from datetime import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-
-
-#%% 因子
 
 class WTS_factor:
     def __init__(self, price, symbol_list):
@@ -75,12 +71,14 @@ class WTS_factor:
         self.VOLUME = price.loc[(slice(None), 'volume'), :].droplevel(1)[symbol_list]
         self.AMOUNT = price.loc[(slice(None), 'amount'), :].droplevel(1)[symbol_list]
         self.RET = price.loc[(slice(None), 'close'), :].droplevel(1).pct_change().fillna(0)[symbol_list]
+        
+        self.OI = price.loc[(slice(None), 'oi'), :].droplevel(1)[symbol_list]
         # self.HD         = self.HIGH - DELAY(self.HIGH,1)
         # self.LD         = DELAY(self.LOW,1) - self.LOW 
         # self.TR         = MAX(MAX(self.HIGH-self.LOW, ABS(self.HIGH-DELAY(self.CLOSE,1))),ABS(self.LOW-DELAY(self.CLOSE,1)))
 
 
-    #%%% 1-50
+    #--- 1-50
     def alpha_001(self, N=6):
         # (-1 * CORR(RANK(DELTA(LOG(VOLUME), 1)), RANK(((CLOSE - OPEN) / OPEN)), 6))
         return (-1 * CORR(RANK(DELTA(LOG(self.VOLUME), 1)), RANK(((self.CLOSE - self.OPEN) / self.OPEN)), N))
@@ -323,7 +321,7 @@ class WTS_factor:
         temp4 = SUM(IFELSE(temp1 > temp2, 0, temp3), N)
 
         return (temp4 / (temp4 + SUM(IFELSE(temp1 < temp2, 0, temp3), N)))
-    #%%% 51-100
+    #--- 51-100
     def alpha_051(self, N=12):
         # SUM(((HIGH+LOW)<=(DELAY(HIGH,1)+DELAY(LOW,1))?0:MAX(ABS(HIGH-DELAY(HIGH,1)),ABS(LOW-DELAY(LOW,1)))),12)
         # /(SUM(((HIGH+LOW)<=(DELAY(HIGH,1)+DELAY(LOW,1))?0:MAX(ABS(HIGH-DELAY(HIGH,1)),ABS(LOW-DELAY(LOW,1)))),12)
@@ -591,7 +589,7 @@ class WTS_factor:
     def alpha_100(self, N=20):
         # STD(VOLUME,20)
         return STD(self.VOLUME, 20)
-    #%%% 101-150
+    #--- 101-150
     def alpha_101(self, N=15, M=37):
         # ((RANK(CORR(CLOSE,SUM(MEAN(VOLUME,30),37),15))<RANK(CORR(RANK(((HIGH*0.1)+(VWAP*0.9))),RANK(VOLUME),11)))*-1)
         return ((RANK(CORR(self.CLOSE, SUM(MEAN(self.VOLUME, 2 * N), M), N))
@@ -843,7 +841,7 @@ class WTS_factor:
         # (CLOSE + HIGH + LOW)/3 * VOLUME
         return -(self.CLOSE + self.HIGH + self.LOW) / 3 * self.VOLUME  # LVP
     
-    #%%% 151-200
+    #--- 151-200
     def alpha_151(self, N=20):
         # SMA(CLOSE-DELAY(CLOSE,20),20,1)
         return SMA(self.CLOSE - DELAY(self.CLOSE, N), N, 1)
@@ -1110,7 +1108,7 @@ class WTS_factor:
         # 20日夏普比率
         return SHARPE(self.RET, N)
 
-    #%%% 201-250
+    #--- 201-250
     def alpha_201(self, N=60):
         # 60日夏普比率
         return SHARPE(self.RET, N)
@@ -1315,122 +1313,18 @@ class WTS_factor:
         mad = mad.diff(5)
         return mad
 
-
-def WTS_factor_handle(factor, nsigma=3):
-    #-----2.1 标准化（正态）
-    factor = filter_extreme_normalize(factor, axis='columns', method=2)
-    #-----2.2 处理缺失值
-    factor = factor.fillna(method='ffill')
-    #-----2.3 处理异常值（3sigma）
-    factor[factor > nsigma] = nsigma 
-    factor[factor < -nsigma] = -nsigma
-    return factor
-
-def load_basic_info(filepath_future_list, filepath_factorTable2023):
-    ### 1 基础信息表
-    # 期货列表，基础信息表
-    future_info = pd.read_csv(filepath_future_list,index_col=0)
+    #--- fundamental
+    def alpha_f1(self, file_dir):
+        return pd.read_csv(file_dir, index_col=0, parse_dates=True)
     
-    # F和PV都交易的品种，基础信息表里用tradeF列标识
-    trade_cols = future_info[future_info.tradeF.fillna(False)].index.tolist()
     
-    # BigMom2023的factorTable
-    df_factorTable = pd.read_excel(filepath_factorTable2023, index_col=0)
-    
-    list_factor_test = df_factorTable[df_factorTable.tag_test == 1].index.tolist()
-    
-    return future_info, trade_cols, list_factor_test, df_factorTable
-
-def load_local_data(filepath_index, filepath_factorsF, future_info, 
-                    trade_cols,start_date, end_date):
-    ### 2 品种指数日数据
-    print('load loca data......')
-    print(f'start_date: {start_date}')
-    print(f'end_date: {end_date}')
-    # 品种指数数据，根据本地落地的1分钟数据生成的日数据，按照时间串行存储，通过code字段标记
-    '''
-                      open       high        low  ...  barsID    pctChg  code
-    tradingday                                   ...                        
-    2012-05-10   6190.000   6193.000   6082.000  ...       0  0.000000    AG
-    2012-05-11   6110.000   6114.000   6001.000  ...       1 -0.022476    AG
-    2012-05-14   6040.000   6045.000   5960.000  ...       2 -0.004332    AG
-    '''
-    price = pd.read_csv(filepath_index, index_col=0, parse_dates=True)
-    
-    price.sort_index(inplace=True)
-    
-    price = price[start_date : end_date]
-    
-    # 交易成本
-    # 把品种乘数先当到表里
-    price = price.merge(future_info.loc[trade_cols, ['point','type','commission']], left_on='code', right_index=True)
-    # 手续费
-    price['fee'] = np.where(price['type']==0, price['commission']/price.close/price.point,
-                             price['commission'])
-    # 总交易成本（跳空损益+手续费）
-    price['cost'] = price['open'] / price['pre_close'] - 1 + price['fee']
-    # 通过vwap和volume计算amount
-    price['amount'] = price.avg * price.volume
-    # 计算市值
-    price['mkt_value'] = price.close * price.oi * price.point
-    ## 后面几步是为了和之前的数据结构统一
-    price.set_index('code',append=True, inplace=True)
-    # 先把品种放回到列上，然后再把列上olhc字段放到index上。实现较为清晰的数据结构
-    price = price.unstack(1).stack(0) 
-    '''
-    code                             A            AG  ...  ZC            ZN
-    tradingday                                        ...                  
-    2010-01-04 amount     1.309526e+09           NaN  ... NaN  8.155711e+09
-               avg        4.068899e+03           NaN  ... NaN  2.150779e+04
-               barsID     0.000000e+00           NaN  ... NaN  0.000000e+00
-               close      4.057000e+03           NaN  ... NaN  2.143500e+04
-               high       4.089000e+03           NaN  ... NaN  2.172000e+04
-                               ...           ...  ...  ..           ...
-    2023-07-13 oi         1.972420e+05  8.639010e+05  ... NaN  2.066940e+05
-    '''
-    
-    ### 3 品种主力数据
-    
-    #--- 3.1 通过原quote2生成
-    # =============================================================================
-    # df_MS_sp = pd.read_csv(filepath_mainsub, index_col='date',parse_dates=True)[start_date:end_date]
-    # df_main_all = df_MS_sp[df_MS_sp.type == 'main']
-    # df_main_all.loc[:,'pctChg'] = df_main_all.close / df_main_all.pre_close - 1
-    # df_main_all.loc[:,'jump'] = df_main_all.open / df_main_all.pre_close - 1
-    # 
-    # df_main_ret = df_main_all[['product','pctChg']].set_index(['product'],append=True).unstack(level=1)
-    # df_main_ret = df_main_ret.droplevel(level=0, axis='columns')
-    # df_main_ret.sort_index(inplace=True)
-    # 
-    # =============================================================================
-    #--- 3.2 直接从h5文件读取
-    df_main_ret = pd.read_hdf(filepath_factorsF, key='returns')[trade_cols][start_date : end_date]
-    
-    ### 4 生成实例
-    wts = WTS_factor(price, trade_cols)
-    
-    ### 3 品种指数收益和主力合约收益
-    retIndex = wts.CLOSE.pct_change().fillna(0)
-    
-    retMain = df_main_ret
-    
-    ### 5手续费
-    cost = wts.COST.shift(-1).fillna(0)
-    
-    # 以指数长度为基准对齐主力收益
-    temp = pd.DataFrame(1, index=retIndex.index, columns=['temp'])
-    retMain = pd.merge(temp, retMain, how='left', left_index=True, right_index=True)[trade_cols].fillna(0)
-    del temp
-        
-    return price, retIndex, retMain, cost
-
 #%% MAIN
 if __name__ == "__main__":
 
     '''
     这里会用一个yaml文件作为策略所有参数、路径等信息的配置文件
     '''
-    with open('config_BigMom2023.yml', 'r', encoding='utf-8') as parameters:
+    with open('config/config_BigMom2023.yml', 'r', encoding='utf-8') as parameters:
         configFile = yaml.safe_load(parameters)
     
     paramsBank = configFile['params']
@@ -1620,4 +1514,24 @@ if __name__ == "__main__":
           @ {filepath_output_ratios_all}''')
 
 
+file_dir = 'D:/Data/tushare/factor/spot_price.csv'
+
+factor = wts.alpha_f1(file_dir)
+
+factor = trim_length(factor, retIndex)
+
+factor.fillna(method='ffill', inplace=True)
+
+cols = list(set(retIndex.columns) & set(factor.columns))
+
+ret = retIndex[cols]
+
+factor = factor[cols]
+
+cost = cost[cols]
+
+factor = WTS_factor_handle(factor, nsigma=3)
+
+_, _, ratio = factor_test_group(factor, ret, cost, h=hp, factorName=test_name,
+                                fig=bool_test_fig, fig_path=filepath_fig)
 

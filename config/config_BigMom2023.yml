@@ -9,48 +9,18 @@ params:
         start_date: '2016-01-01'
         # 结束日
         end_date: '2023-07-13'
-        # 产品市值单元
-        unit: 10000000
+
+weightGenerator:
+    maxW: 0.1
+    window_size: 500
+    step_size: 20
+    dateNum: 20
+    list_objective: ['average_weight', 'min_volatility_cvx']
+    rebalance_trigger: True
         
-    modules:
-        #是否更新数据
-        refresh: False
-        #是否重新测试因子
-        retest: False
-        # 是否重新组合
-        reComposite: False
-        # 是否重新算权重
-        reWeight: True
-        # 是否重新挑选因子
-        rePick: False
-        # 是否实盘
-        isTrade: True
-        
-        fig: False
-    modelPV:
-        # 因子日收益相关性阈值
-        th_corr: 0.7
-        # 因子日收益sr阈值
-        th_sr: 1
-        # 样本内外时间点
-        out_date: '2022-05-31'
-        
-    trade: 
-        # 回撤控制阈值
-        th_dd: -0.015
-        # 最大杠杆倍数
-        levy: 1
-        # PV因子总权重
-        sectionPV: 0.7
-        # F因子总权重
-        sectionF: 0.3
-            
-    account:
-        # 产品配置市值数量（百万）
-        WTS: 5
-        # FSS: 7
-        # TEST: 12
-        
+factor_weight:
+    groupNum: 5
+    date_out: '2023'
 
 test1:
     # 测试因子名称列表
@@ -87,9 +57,6 @@ test:
     # 标准交易费用(估)
     fee: 0.0005
 
-factor_weight:
-    groupNum: 5
-    date_out: '2023'
 
 path:
     filepath_index: 'D:/Data/local_data_daily_update/nj_index_dataset.csv'
@@ -98,63 +65,21 @@ path:
     
     filepath_mainsub: 'D:/Data/tushare/quote/quote2.csv'
     
-    filepath_factorsF: 'D:/Data/factorFunda/dataset/wts_factors&returns_Funda.h5'
+    filepath_factorsF: 'D:/Data/tushare/wts_factors&returns_Funda.h5'
     
     filepath_factorTable2023: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/config/factorTable2023.xlsx'
     
-    filepath_factorPools: 'D:/ProgramFiles/Strategy/BigMom2023/factorPools.xlsx'
+    filepath_factorPools: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/config/factorPools.xlsx'
     
     filepath_output: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/output/'
-       
-    # filepath_output_fig: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/output/factor_sec_returns_fig/'
     
-    # filepath_output_ratios: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/output/factor_returns_ratios_csv/'
+    filepath_cal_date: 'D:/Data/cal_date.csv'
     
+    filepath_capital: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/config/BigMom2023_capital.csv'
     
-    # #detail: 'F数据源'
-    # path_0: 'D:/ProgramFiles/python/BigMomPVF_fundamental/dataset/'
-        
-    # #detail: '总数据源'
-    # path_1: 'D:/ProgramFiles/python/BigMomPVF/dataset/'
-
-    # # detail: '基础表'
-    # filepath_future_list: 'dataset/future_list.csv'
-    # filepath_fut_list:  'dataset/futureList.csv'
-    # #detail: '分组日收益图'
-    # filepath_fig_sec: 'output/fig_factor_return/sec'
-      
-    # #detail: '日线数据'
-    # filepath_csv_day: 'D:/ProgramFiles/python/BigMomPVF/dataset/nj_index_D_csv/'
-
-  
-    # ## PV相关文件
-    # filepath_factor_list:  'dataset/factorTable.xlsx'
+    filepath_templete: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/position_trade/CTA_BigMom.csv'
     
-    # filepath_factorTablePV: 'dataset/factorTable.xlsx'
-    
-    # filepath_data1m: 'D:/Data/index_update/'
-
-    # filepath_data1mClean: 'D:/Data/index_update_clean/'
-    
-    # filepath_factorsPV: 'dataset/wts_factors&returns_PV.h5'
-    
-    # # pv选取因子日收益
-    # filepath_pick_dailyReturn_pv: 'output/dailyReturn_factor_sec/dailyReturn_pick.xlsx'
-    
-    # # 因子绩效统计表
-    # filepath_perf_ratio: 'output/ratio_factor_sec/'
-
-    # # 因子日收益h5
-    # filepath_factor_dailyReturn: 'output/dailyReturn_factor_sec/'
-     
-    # #detail: 'pv选取因子的权重'
-    # filepath_pick_weight_pv: 'output/wight_allocation/weight_pick_PV.csv'
-        
-    # #detail: 'pv选取因子列表'
-    # filepath_pick_factorlist_pv: 'output/dailyReturn_factor_sec/factor_tradelist.csv'
-   
-   
-   
+    filepath_tradePosition: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/position_trade/'
     # ## F相关文件   
     # #detail: 'f选取因子的权重'
     # filepath_pick_weight_f: 'output/wight_allocation/weight_pick_F.csv'

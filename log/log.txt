@@ -1,0 +1,30 @@
+INFO - Run Time: Tue Dec 19 16:50:24 2023
+
+INFO - 1 - Current Trading day : 2023-12-19
+
+INFO - 2 - Load configurations
+
+INFO - 3 - Load cal_date.csv
+
+INFO - 4 - Rebalancing in process...
+
+INFO -         4.1 - Load basic info
+
+INFO -         4.2 - Load updated datasets
+
+INFO -         4.3 - Load factor pool
+
+INFO -         4.4 - Generating factors - Tue Dec 19 16:50:34 2023
+
+INFO -         4.5 -  Use previous files
+
+INFO -                 Number of factors applied : 336 
+
+INFO -                 Max weight constraint: 10.0%
+
+INFO -                 Lookback window size: 500
+
+INFO -         4.6 - average_weight - Generating  position file
+
+INFO -         4.6 - min_volatility_cvx - Generating  position file
+
