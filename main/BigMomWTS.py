@@ -1314,8 +1314,9 @@ class WTS_factor:
         return mad
 
     #--- fundamental
-    def alpha_f1(self, file_dir):
-        return pd.read_csv(file_dir, index_col=0, parse_dates=True)
+    def alpha_f1(self, file_dir, N ):
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
     
     
 #%% MAIN
@@ -1365,20 +1366,20 @@ if __name__ == "__main__":
     这里用的是全样本测试，
     示例是用指数收益
     '''
-    ret = retIndex
+    dailyReturn_all = retIndex
     
     # 保证收益率和因子的表头一致
     # 因为retIndex是由CLASS wts生产的，所以是一样的
-    if ret is retMain:
-        if ret.columns is not retIndex.columns:
+    if dailyReturn_all is retMain:
+        if dailyReturn_all.columns is not retIndex.columns:
             
-            tradeCols = list(set(ret.columns) & set(retIndex.columns))
+            tradeCols = list(set(dailyReturn_all.columns) & set(retIndex.columns))
             
             tradeCols.sort()
             
             wts = WTS_factor(price, tradeCols)
             
-            ret = retMain[tradeCols]
+            dailyReturn_all = retMain[tradeCols]
             
         else:
             pass
@@ -1403,7 +1404,6 @@ if __name__ == "__main__":
     N = 60
     
     factorName = 'alpha_206'
-    factorName = 'alpha_238'
     factorName = 'alpha_f1'
     
     '''
@@ -1414,33 +1414,7 @@ if __name__ == "__main__":
        
         print(factorName)
         
-        '''
-        在factorTable中， paramName 和 paramSpace 单元格内数据通过；来隔断
-        
-        load到脚本中为字符串的形式
-        paramName:
-        In : df_factorTable.loc[factorName, 'paramName'].split(';')
-        Out: ['N', 'M', 'hp']
-        
-        相对应每个变量的变量空间也是字符串，但是要声明变量的类型，如range,list
-        paramSpace:
-            
-        In： df_factorTable.loc[factorName, 'paramSpace'].split(';')
-        Out: ['range(10,110,10)', 'range(10,110,20)', 'list((5,10))']   
-        '''
-        # load因子参数名称
-        list_paramName = df_factorTable.loc[factorName, 'paramName'].split(';')
-        # load因子参数空间（字符串） 
-        list_paramSpace = df_factorTable.loc[factorName, 'paramSpace'].split(';')
-        # 把因子从字符串形式eval成相对于的类型
-        parameters = [eval(param) for param in list_paramSpace]
-        # 生成参数列表
-        if 'file' in list_paramName[0] or 'path' in list_paramName[0] :
-            
-            parameter_list = [(parameters[0], x ) for x in list(itertools.product(*parameters[1:])) ]
-            
-        else :
-            parameter_list = list(itertools.product(*parameters))
+        parameter_list, list_paramName, list_paramSpace = generate_paramList(factorName, df_factorTable)
         
         # 按照因子保存结果
         filepath_output_factor = f'{filepath_test_output}{factorName}/'
@@ -1464,15 +1438,16 @@ if __name__ == "__main__":
             factor = eval(f'wts.{factorName}{param[:-1]}')
                           
             if factor is None:
-                print(param, i ,' invalid parameters!')   
+                print(param, i ,' invalid parameters!')
                 
             else:
             #---2 因子处理
+                [factor, _ret, _cost] = trim_factor(factor, retIndex, dailyReturn_all, cost)
                 # 调用因子处理函数
                 factor = WTS_factor_handle(factor, nsigma=3)
             #---3 截面测试
                 # 有交易费的测试
-                _, _, ratio = factor_test_group(factor, ret, cost, h=hp, factorName=test_name,
+                _, _, ratio = factor_test_group(factor, _ret, _cost, h=hp, factorName=test_name,
                                                 fig=bool_test_fig, fig_path=filepath_fig)
                 
                 # dfratio.loc[test_name,:] = ratio + [factorName] +  [str(param)]
@@ -1480,6 +1455,7 @@ if __name__ == "__main__":
         
         # 单因子测试绩效保存
         dfratio_factor.to_csv(f'{filepath_output_factor}{factorName}_performance_ratios.csv')
+        
         # 汇总合并
         dfratio = pd.concat([dfratio, dfratio_factor], axis=0)
         
@@ -1521,24 +1497,4 @@ if __name__ == "__main__":
           @ {filepath_output_ratios_all}''')
 
 
-file_dir = 'D:/Data/tushare/factor/spot_price.csv'
-
-factor = wts.alpha_f1(file_dir)
-
-factor = trim_length(factor, retIndex)
-
-factor.fillna(method='ffill', inplace=True)
-
-cols = list(set(retIndex.columns) & set(factor.columns))
-
-ret = retIndex[cols]
-
-factor = factor[cols]
-
-cost = cost[cols]
-
-factor = WTS_factor_handle(factor, nsigma=3)
-
-_, _, ratio = factor_test_group(factor, ret, cost, h=hp, factorName=test_name,
-                                fig=bool_test_fig, fig_path=filepath_fig)
 
