@@ -18,8 +18,37 @@ import seaborn as sns
 import yaml
 # import BigMomWTS as bm
 from datetime import datetime
+import itertools
 
 #%% 因子清洗
+
+def trim_factor(factor, retIndex, *args):
+    # length
+    if factor.shape[0] != retIndex.shape[0]:
+        
+        temp = pd.DataFrame(1, index=retIndex.index, columns=['temp'])
+        
+        factor = pd.merge(temp, factor, how='left', left_index=True, right_index=True)
+        
+        factor.fillna(method='ffill', inplace=True)
+    
+    # width
+    res = []
+    if factor.shape[1] != retIndex.shape[1]:
+        
+        cols = list(set(retIndex.columns) & set(factor.columns))
+        
+        cols.sort()
+        
+        res.append(factor[cols])
+        
+        for arg in args:
+            res.append(arg[cols])
+
+    return res
+
+
+
 def WTS_factor_handle(factor, nsigma=3):
     #-----2.1 标准化（正态）
     factor = filter_extreme_normalize(factor, axis='columns', method=2)
@@ -838,10 +867,6 @@ def load_local_data(filepath_index, filepath_factorsF, future_info,
         
     return price, retIndex, retMain, cost
 
-def trim_length(retMain, retIndex):
-    temp = pd.DataFrame(1, index=retIndex.index, columns=['temp'])
-    retMain = pd.merge(temp, retMain, how='left', left_index=True, right_index=True)
-    return retMain.iloc[:,1:]
 
 def load_factorPools(filepath_factorPools):
     
@@ -901,3 +926,35 @@ def get_rebalance_date(filepath_cal_date : str, dateNum: int = 20):
     
     return cal_date
 
+def generate_paramList(factorName, df_factorTable):
+    '''
+    在factorTable中， paramName 和 paramSpace 单元格内数据通过；来隔断
+    
+    load到脚本中为字符串的形式
+    paramName:
+    In : df_factorTable.loc[factorName, 'paramName'].split(';')
+    Out: ['N', 'M', 'hp']
+    
+    相对应每个变量的变量空间也是字符串，但是要声明变量的类型，如range,list
+    paramSpace:
+        
+    In： df_factorTable.loc[factorName, 'paramSpace'].split(';')
+    Out: ['range(10,110,10)', 'range(10,110,20)', 'list((5,10))']   
+    '''
+
+    # load因子参数名称
+    list_paramName = df_factorTable.loc[factorName, 'paramName'].split(';')
+    # load因子参数空间（字符串） 
+    list_paramSpace = df_factorTable.loc[factorName, 'paramSpace'].split(';')
+    # 把因子从字符串形式eval成相对于的类型
+    parameters = [eval(param) for param in list_paramSpace]
+    
+    # 生成参数列表
+    if 'file' in list_paramName[0] or 'path' in list_paramName[0] :
+        # 对量价之外因子的特殊处理
+        parameter_list = [(parameters[0], *x ) for x in list(itertools.product(*parameters[1:])) ]
+        
+    else :
+        parameter_list = list(itertools.product(*parameters))
+    
+    return parameter_list, list_paramName, list_paramSpace
