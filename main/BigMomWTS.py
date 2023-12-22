@@ -1352,7 +1352,7 @@ if __name__ == "__main__":
     # sample_range = f'sample{start_date[:4]}to{end_date}'
     Description = ''
     
-    test_date = 'factorTest_20231114'
+    test_date = 'factorTest_20231221'
     # test_date = f'''factorTest_{datetime.today().strftime("%Y%m%d")}'''
     
     # 输出文件夹
@@ -1404,11 +1404,13 @@ if __name__ == "__main__":
     
     factorName = 'alpha_206'
     factorName = 'alpha_238'
+    factorName = 'alpha_f1'
+    
     '''
     
         
     for factorName in list_factor_test:
-    # for factorName in ['alpha_206']:
+    # for factorName in ['alpha_f1']:
        
         print(factorName)
         
@@ -1433,7 +1435,12 @@ if __name__ == "__main__":
         # 把因子从字符串形式eval成相对于的类型
         parameters = [eval(param) for param in list_paramSpace]
         # 生成参数列表
-        parameter_list = list(itertools.product(*parameters))
+        if 'file' in list_paramName[0] or 'path' in list_paramName[0] :
+            
+            parameter_list = [(parameters[0], x ) for x in list(itertools.product(*parameters[1:])) ]
+            
+        else :
+            parameter_list = list(itertools.product(*parameters))
         
         # 按照因子保存结果
         filepath_output_factor = f'{filepath_test_output}{factorName}/'
