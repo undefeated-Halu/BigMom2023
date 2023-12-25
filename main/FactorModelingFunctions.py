@@ -555,6 +555,20 @@ def weightReconstrution(dfpos_longshort1,dfgroupII,groupWeightTh=0.2, mode='spre
             
     return dfposG2
 
+def generate_lots(weight, capital, future_info, price):
+    cols = weight.columns
+    
+    point = future_info.loc[cols, 'point']
+    
+    min_lots = future_info.loc[cols, 'minTradeLots']
+    
+    dfcap = price[cols] * point * min_lots
+    
+    dflots = (capital * weight / dfcap).fillna(0).round() * min_lots    
+    
+    return dflots
+
+
 def output_position(weight, capital, future_info, price, fileName,
                     filepath_templete, filepath_tradePosition):
     cols = weight.columns

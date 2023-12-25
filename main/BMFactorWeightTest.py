@@ -26,7 +26,7 @@ root_data = 'D:/Data/'
 import pandas as pd
 import numpy as np
 import os
-# os.chdir(root_path)
+os.chdir(root_path)
 import yaml
 import sys
 sys.path.append(f'{root_path}main')
@@ -73,6 +73,9 @@ df_factorPools, periods = bmBase.load_factorPools(filepath_factorPools)
 forward_returns = bmBase.compute_forward_returns(rets, periods)
 
 forward_returns_group = bmBase.factor_fast_groupon(forward_returns, groupNum=2)
+
+
+dt = '2022-12-30'
 
 #%% 生成 数据
 if os.path.exists('data/factorsDailyRet.csv'):
@@ -169,7 +172,6 @@ else:
 
 
 #% 因子组合 1 样本外
-dt = '2022-12-30'
 
 n_prod = df_f_rets.shape[1]
 
@@ -396,15 +398,16 @@ ax.grid(True)
 plt.figure()
 weight.plot()
 
-
 #%% cvx 推进
 
 '''
 window_size = 120
 
-step_size = 20
+step_size = 1
 
-weight_max = 0.1
+weight_max = 0.05
+
+func = 'min_volatility_cvx'
 
 dfweight = pd.DataFrame(np.NaN, index=rets.index, columns=df_f_rets.columns)'
 '''
@@ -460,11 +463,14 @@ for window_size, step_size, weight_max in parameter_list[1:]:
         
         signal = pd.DataFrame(0, index=rets.index, columns=rets.columns)
         
-        for i in range(df_f_rets.shape[1]):
+        for i in dfweightCopy.columns:
             
-            signal += df_f_signals.xs(i, level=1).mul(dfweightCopy.iloc[:,i], axis=0).fillna(0)
+            signal += df_f_signals.xs(int(i), level=1).mul(dfweightCopy[i], axis=0).fillna(0)
         
         signal = signal.div(signal.abs().sum(axis=1), axis=0)
+        
+        signal.to_csv(f'position_trade/tickerWeight{test_code}.csv')
+       
         
         ret_ptf[func] = (signal.shift() * rets -  signal.diff() * cost).sum(axis=1).cumsum()
     
@@ -475,7 +481,7 @@ for window_size, step_size, weight_max in parameter_list[1:]:
     # ax.plot(ret_ptf, 'k', label=f'back{window_size}forward{step_size}')
     for col in ret_ptf.columns:
         
-        perf_ratios[col] = bmBase.performance_ratio(ret_ptf[col].diff()[window_size:].fillna(0))
+        perf_ratios[col] = bmBase.performance_ratio(ret_ptf[col].diff().fillna(0))
         
         ax.plot(ret_ptf[col][window_size:].diff().cumsum(), label=col, alpha=0.5)
         
@@ -500,8 +506,8 @@ for window_size, step_size, weight_max in parameter_list[1:]:
     ret_all = pd.concat([ret_all, ret_ptf])
     
     
-ret_all.to_csv('output/portfolio_param_testCVX/portfolio_param_test_cumret.csv')
-perf_ratios_all.to_csv('output/portfolio_param_testCVX/perf_ratios_all.csv')    
+# ret_all.to_csv('output/portfolio_param_testCVX/portfolio_param_test_cumret.csv')
+perf_ratios_all.to_csv('output/portfolio_param_testCVX/perf_ratios_all_step1_120.csv')    
 
 '''
 _, ax = plt.subplots()
@@ -514,10 +520,94 @@ ax.legend(loc=2)
 ax.grid(True)
 '''
 
+#%% 杠杆调节
+k = 60
+th_std = 0.01
+max_lev = 5
+
+
+perf_ratios = pd.DataFrame(index=['ar','sr','mdd','mar'])
+
+signal = pd.read_csv(f'output/portfolio_param_testCVX/tickerWeight500_1_10.csv', index_col=0, parse_dates=True)
+
+ret_ptf = (signal.shift() * rets -  signal.diff() * cost).sum(axis=1)
+
+perf_ratios['plain'] = bmBase.performance_ratio(ret_ptf.fillna(0))
+
+
+retCum_ptf = ret_ptf.cumsum()
+
+std_ = ret_ptf.rolling(k).std()
+
+lev = np.minimum((th_std / std_), max_lev)
+
+ret_ptf_lev = ret_ptf * (lev.shift())
+
+perf_ratios['plain'] = bmBase.performance_ratio(ret_ptf_lev.fillna(0))
+
+
+retCum_ptf_lev = ret_ptf_lev.cumsum()
+
+
+_,ax = plt.subplots()
+ax.plot(retCum_ptf, 'k', label='plain')
+ax.plot(retCum_ptf_lev, 'b', label='leveraged')
+ax2 = ax.twinx()
+ax2.plot(lev, 'g',label='leverage')
+ax.grid(True)
+ax.legend(loc=2)
+ax2.legend(loc=3)
 
 
 
 
+ret_out = retCum_ptf_lev[dt:]
+ret_out = ret_out - ret_out[0]
+_, ax = plt.subplots()
+ax.plot(ret_out,  'r', lw=2, label='outSample')
+ax.grid(True)
+ax.legend(loc='best')
 
 
+
+#%% 跟踪误差
+capital = 50e6
+
+
+
+signal = pd.read_csv(f'output/portfolio_param_testCVX/tickerWeight500_1_10.csv', index_col=0, parse_dates=True)
+
+close = price.loc[(slice(None), 'close'), :].droplevel(1)[trade_cols]
+
+cols = signal.columns
+
+point = future_info.loc[cols, 'point']
+
+min_lots = 1#future_info.loc[cols, 'minTradeLots']
+
+dfcap = close[cols] * point * min_lots
+
+dflots = (capital * signal / dfcap).fillna(0).round() * min_lots
+
+dfreturn = pd.DataFrame()
+
+dfreturn['real'] = (dflots.shift() * close.diff().fillna(0) * point).sum(axis=1) / capital
+
+dfreturn['theortical'] = (signal.shift() * close.pct_change().fillna(0)).sum(axis=1)
+
+dfreturn['trackingError'] = dfreturn['theortical'] - dfreturn['real']
+
+dfreturn.trackingError.cumsum().plot()
+
+
+_, ax = plt.subplots()
+ax.plot(dfreturn['theortical'].cumsum(),  'k', lw=1, label='theortical')
+ax.plot(dfreturn['real'].cumsum(),  'r', lw=2, label='real')
+ax.grid(True)
+ax.legend(loc='best')
+ax.set_title(f'MV={int(capital/1e6)} mil')
+
+ax2 = ax.twinx()
+ax2.plot(dfreturn.trackingError.cumsum(),'b', label='trackingError')
+ax2.legend(loc=4)
 
