@@ -1320,6 +1320,39 @@ class WTS_factor:
         factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
         return MEAN(factor, N)
     
+    def alpha_f2(self, file_dir, N ):
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f3(self, file_dir, N ):
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f4(self, file_dir, N ):
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f5(self, file_dir, N ):
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f6(self, file_dir, N ):
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f7(self, file_dir, N ):
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f8(self, file_dir, N ):
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f9(self, file_dir, N ):
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    
     
 #%% MAIN
 if __name__ == "__main__":
