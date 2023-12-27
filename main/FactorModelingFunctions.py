@@ -87,10 +87,6 @@ def HalfDecay(H:int, T:int):
     
     return res
 
-
-def objective_functions(method='min_sr'):
-    if method == 'min_sr':
-        pass
         
 def opt_stats(weights,daily_profit):
     '''
