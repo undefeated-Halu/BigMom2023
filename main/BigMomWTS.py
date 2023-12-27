@@ -42,9 +42,11 @@ os.chdir(path_strategy)
 import sys
 sys.path.append('D:/Data/factorFunda/')
 sys.path.append(path_lib)
+sys.path.append(f'{path_strategy}main/')
+
 import bottleneck as bn
-from main.FactorCalcFunctions import *
-from main.FactorBaseFunctions import *
+from FactorCalcFunctions import *
+from FactorBaseFunctions import *
 import yaml
 import ctaBasicFunc as cta
 import itertools

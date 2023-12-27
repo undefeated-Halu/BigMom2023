@@ -571,9 +571,7 @@ ax.legend(loc='best')
 
 
 #%% 跟踪误差
-capital = 50e6
-
-
+capital = 100e6
 
 signal = pd.read_csv(f'output/portfolio_param_testCVX/tickerWeight500_1_10.csv', index_col=0, parse_dates=True)
 
