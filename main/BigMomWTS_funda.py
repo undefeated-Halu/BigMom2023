@@ -130,11 +130,13 @@ def fundaFactorGenerator():
 
     df_all = (df_long + df_short).replace(0, np.nan).fillna(method='ffill')[start_date: ]
     
+    df_all.to_csv(f'{path_data}oi_all.csv')
+    
     df_spot_basis.to_csv(f'{path_data}oi_all.csv')
     
     df_raw = (df_long - df_short).fillna(method='ffill')[start_date: ]
     
-    df_spot_basis.to_csv(f'{path_data}raw_ls.csv')
+    df_raw.to_csv(f'{path_data}raw_ls.csv')
     
     
 
