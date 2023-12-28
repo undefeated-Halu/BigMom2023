@@ -779,7 +779,7 @@ def load_basic_info(filepath_future_list, filepath_factorTable2023, method='trad
     
     return future_info, trade_cols, list_factor_test, df_factorTable
 
-def load_local_data(filepath_index, filepath_factorsF, future_info, 
+def load_local_data_backup(filepath_index, filepath_factorsF, future_info, 
                     trade_cols,start_date, end_date):
     ### 2 品种指数日数据
     print('load loca data......')
@@ -799,7 +799,7 @@ def load_local_data(filepath_index, filepath_factorsF, future_info,
     price.sort_index(inplace=True)
     
     price = price[start_date : ]
-    
+    # 2023Dec28 损益计算全部改为主力合约基准
     # 交易成本
     # 把品种乘数先当到表里
     price = price.merge(future_info.loc[trade_cols, ['point','type','commission']], 
@@ -809,6 +809,8 @@ def load_local_data(filepath_index, filepath_factorsF, future_info,
                              price['commission'])
     # 总交易成本（跳空损益+手续费）
     price['cost'] = price['open'] / price['pre_close'] - 1 + price['fee']
+    
+    
     # 通过vwap和volume计算amount
     price['amount'] = price.avg * price.volume
     # 计算市值
@@ -844,15 +846,12 @@ def load_local_data(filepath_index, filepath_factorsF, future_info,
     # df_main_ret.sort_index(inplace=True)
     # 
     # =============================================================================
-    #--- 3.2 直接从h5文件读取
+    #--- 3.2 直接从文件读取
     trade_cols2 = future_info[future_info['tradeF'].fillna(False)].index.tolist()
     df_main_ret = pd.read_hdf(filepath_factorsF, key='returns')[trade_cols2][start_date : ]
     
     ### 4 生成实例
     # wts = WTS_factor(price, trade_cols)
-    
-    # ### 3 品种指数收益和主力合约收益
-    # retIndex = wts.CLOSE.pct_change().fillna(0)
     
     retIndex = price.loc[(slice(None), 'close'), :].droplevel(1)[trade_cols].pct_change().fillna(0)
     
@@ -867,6 +866,66 @@ def load_local_data(filepath_index, filepath_factorsF, future_info,
         
     return price, retIndex, retMain, cost
 
+def load_local_data(filepath_index, filepath_main, future_info, start_date):
+    print('load loca data......')
+    print(f'start_date: {start_date}')
+
+    ### 2 品种指数日数据
+    dfindex = pd.read_csv(filepath_index, index_col=0, parse_dates=True)
+    
+    dfindex.sort_index(inplace=True)
+    
+    dfindex = dfindex[start_date : ]  
+    
+    print(f'index data is updated to {dfindex.index[-1].date()}')
+    
+        
+    dfindex = dfindex.merge(future_info.loc[:, ['point','type','commission']], 
+                            left_on='code', right_index=True)    
+
+    # 手续费
+    dfindex['fee'] = np.where(dfindex['type']==0, dfindex['commission']/dfindex.close/dfindex.point,dfindex['commission'])
+    # 总交易成本（跳空损益+手续费）
+    dfindex['cost'] = dfindex['open'] / dfindex['pre_close'] - 1 + dfindex['fee']
+    
+    # 通过vwap和volume计算amount
+    dfindex['amount'] = dfindex.avg * dfindex.volume
+    # 计算市值
+    dfindex['mkt_value'] = dfindex.close * dfindex.oi * dfindex.point
+    ## 后面几步是为了和之前的数据结构统一
+    dfindex.set_index('code', append=True, inplace=True)
+    # 先把品种放回到列上，然后再把列上olhc字段放到index上。实现较为清晰的数据结构
+    dfindex = dfindex.unstack(1).stack(0) 
+    
+    costIndex = dfindex.loc[(slice(None), 'cost'), :].droplevel(1).shift(-1).fillna(0)
+
+    ### 3 品种主力数据   
+    dfmain = pd.read_csv(f'{filepath_main}main.csv', index_col='date',parse_dates=True)[start_date:]
+    
+    print(f'main data is updated to {dfmain.index[-1].date()}')
+
+    dfmain = dfmain.stack().to_frame('close').reset_index(level=1)
+
+    dfmain = dfmain.merge(future_info.loc[:, ['point','type','commission']], 
+                          left_on=dfmain.columns[0], right_index=True)    
+
+    dfmain['fee'] = np.where(dfmain['type']==0, dfmain['commission']/dfmain.close/dfmain.point, dfmain['commission'])
+    # 总交易成本（跳空损益+手续费）    
+    fee = dfmain[['level_1','fee']].set_index('level_1',append=True).unstack('level_1')
+    
+    fee = fee.stack(0).droplevel(1)
+       
+    retMain = pd.read_csv(f'{filepath_main}retMain.csv', index_col='date',parse_dates=True)[start_date:]
+    
+    dfmainJump = pd.read_csv(f'{filepath_main}retMainJump.csv', index_col='date',parse_dates=True)[start_date:]
+    
+    ### 4 日收益
+    retIndex = dfindex.loc[(slice(None), 'close'), :].droplevel(1).pct_change().fillna(0)
+    
+    ### 5 交易赢损
+    costMain = dfmainJump + fee
+            
+    return dfindex, retIndex, costIndex, dfmain, retMain, costMain
 
 def load_factorPools(filepath_factorPools):
     
