@@ -65,6 +65,10 @@ path:
     
     filepath_mainsub: 'D:/Data/tushare/quote/quote2.csv'
     
+    filepath_main: 'D:/Data/tushare/factor/'
+    
+    filepath_retMainJump: 'D:/Data/tushare/factor/retMainJump.csv'
+    
     filepath_factorsF: 'D:/Data/tushare/wts_factors&returns_Funda.h5'
     
     filepath_factorTable2023: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/config/factorTable2023.xlsx'
