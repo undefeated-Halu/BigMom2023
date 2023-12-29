@@ -22,30 +22,52 @@ import itertools
 
 #%% 因子清洗
 
-def trim_factor(factor, retIndex, *args):
-    # length
-    if factor.shape[0] != retIndex.shape[0]:
-        
-        temp = pd.DataFrame(1, index=retIndex.index, columns=['temp'])
-        
-        factor = pd.merge(temp, factor, how='left', left_index=True, right_index=True)
-        
-        factor.fillna(method='ffill', inplace=True)
-    
-    # width
-    res = []
-    if factor.shape[1] != retIndex.shape[1]:
-        
-        cols = list(set(retIndex.columns) & set(factor.columns))
-        
-        cols.sort()
-        
-        res.append(factor[cols])
-        
-        for arg in args:
-            res.append(arg[cols])
+def trimShape(retIndex, method='ffill',length=True, width=True, *args):
 
+    list_col = []
+    for arg in args:
+        if width:
+            if arg.shape[1] != retIndex.shape[1]:
+                
+                cols = list(set(retIndex.columns) & set(arg.columns))
+                
+                cols.sort()
+                
+                list_col.append(cols)
+            else:
+                list_col.append(arg.columns.tolist())
+        else:
+            list_col.append(arg.columns.tolist())
+                
+            
+    # length
+    
+    
+    '''
+    如果a与b的长度不同, 以b的长度为基准
+    method是填充na的方法
+    method是字符串 ffill 或者 backfill, 同fillna
+    method是int则填充数值method
+    '''
+    res = []
+    for arg,cols in zip(args, list_col):
+        if length:
+            if arg.shape[0] != retIndex.shape[0]:
+                
+                temp = pd.DataFrame(1, index=retIndex.index, columns=['temp'])
+                
+                arg = pd.merge(temp, arg, how='left', left_index=True, right_index=True)
+                
+                if isinstance(method, str):
+                    arg.fillna(method=method, inplace=True)
+                
+                elif isinstance(method, int):
+                    arg.fillna(method, inplace=True)
+                
+        res.append(arg[cols])
     return res
+    
+
 
 
 
@@ -488,7 +510,9 @@ def factor_test_group(factor, rets, cost, groupNum=5, h=5,  factorName='factor',
                          : pd.cut(x,bins=groupNum, labels=False,duplicates='drop'),axis=1) + 1
     
         
-    #--- 3 重构收益率表的表头,计算为了n期的平均收益率
+    #--- 3 重构收益率表的表头,计算为了n期的平均收益率(计算IC)
+    # 这里不能删， 在计算IC的时候需要这个未来收益率，
+    # 但是在计算收益的时候没有使用
     ret = rets.rolling(h).mean().shift(-h)
     
     #--- 4 loop按照组别循环
@@ -771,6 +795,7 @@ def load_basic_info(filepath_future_list, filepath_factorTable2023, method='trad
     
     # F和PV都交易的品种，基础信息表里用tradeF列标识
     trade_cols = future_info[future_info[method].fillna(False)].index.tolist()
+    trade_cols.sort()
     
     # BigMom2023的factorTable
     df_factorTable = pd.read_excel(filepath_factorTable2023, index_col=0)
