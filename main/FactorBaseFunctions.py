@@ -18,8 +18,59 @@ import seaborn as sns
 import yaml
 # import BigMomWTS as bm
 from datetime import datetime
+import itertools
 
 #%% 因子清洗
+
+def trimShape(retIndex, method='ffill',length=True, width=True, *args):
+
+    list_col = []
+    for arg in args:
+        if width:
+            if arg.shape[1] != retIndex.shape[1]:
+                
+                cols = list(set(retIndex.columns) & set(arg.columns))
+                
+                cols.sort()
+                
+                list_col.append(cols)
+            else:
+                list_col.append(arg.columns.tolist())
+        else:
+            list_col.append(arg.columns.tolist())
+                
+            
+    # length
+    
+    
+    '''
+    如果a与b的长度不同, 以b的长度为基准
+    method是填充na的方法
+    method是字符串 ffill 或者 backfill, 同fillna
+    method是int则填充数值method
+    '''
+    res = []
+    for arg,cols in zip(args, list_col):
+        if length:
+            if arg.shape[0] != retIndex.shape[0]:
+                
+                temp = pd.DataFrame(1, index=retIndex.index, columns=['temp'])
+                
+                arg = pd.merge(temp, arg, how='left', left_index=True, right_index=True)
+                
+                if isinstance(method, str):
+                    arg.fillna(method=method, inplace=True)
+                
+                elif isinstance(method, int):
+                    arg.fillna(method, inplace=True)
+                
+        res.append(arg[cols])
+    return res
+    
+
+
+
+
 def WTS_factor_handle(factor, nsigma=3):
     #-----2.1 标准化（正态）
     factor = filter_extreme_normalize(factor, axis='columns', method=2)
@@ -459,7 +510,9 @@ def factor_test_group(factor, rets, cost, groupNum=5, h=5,  factorName='factor',
                          : pd.cut(x,bins=groupNum, labels=False,duplicates='drop'),axis=1) + 1
     
         
-    #--- 3 重构收益率表的表头,计算为了n期的平均收益率
+    #--- 3 重构收益率表的表头,计算为了n期的平均收益率(计算IC)
+    # 这里不能删， 在计算IC的时候需要这个未来收益率，
+    # 但是在计算收益的时候没有使用
     ret = rets.rolling(h).mean().shift(-h)
     
     #--- 4 loop按照组别循环
@@ -742,6 +795,7 @@ def load_basic_info(filepath_future_list, filepath_factorTable2023, method='trad
     
     # F和PV都交易的品种，基础信息表里用tradeF列标识
     trade_cols = future_info[future_info[method].fillna(False)].index.tolist()
+    trade_cols.sort()
     
     # BigMom2023的factorTable
     df_factorTable = pd.read_excel(filepath_factorTable2023, index_col=0)
@@ -750,7 +804,7 @@ def load_basic_info(filepath_future_list, filepath_factorTable2023, method='trad
     
     return future_info, trade_cols, list_factor_test, df_factorTable
 
-def load_local_data(filepath_index, filepath_factorsF, future_info, 
+def load_local_data_backup(filepath_index, filepath_factorsF, future_info, 
                     trade_cols,start_date, end_date):
     ### 2 品种指数日数据
     print('load loca data......')
@@ -770,7 +824,7 @@ def load_local_data(filepath_index, filepath_factorsF, future_info,
     price.sort_index(inplace=True)
     
     price = price[start_date : ]
-    
+    # 2023Dec28 损益计算全部改为主力合约基准
     # 交易成本
     # 把品种乘数先当到表里
     price = price.merge(future_info.loc[trade_cols, ['point','type','commission']], 
@@ -780,6 +834,8 @@ def load_local_data(filepath_index, filepath_factorsF, future_info,
                              price['commission'])
     # 总交易成本（跳空损益+手续费）
     price['cost'] = price['open'] / price['pre_close'] - 1 + price['fee']
+    
+    
     # 通过vwap和volume计算amount
     price['amount'] = price.avg * price.volume
     # 计算市值
@@ -815,15 +871,12 @@ def load_local_data(filepath_index, filepath_factorsF, future_info,
     # df_main_ret.sort_index(inplace=True)
     # 
     # =============================================================================
-    #--- 3.2 直接从h5文件读取
+    #--- 3.2 直接从文件读取
     trade_cols2 = future_info[future_info['tradeF'].fillna(False)].index.tolist()
     df_main_ret = pd.read_hdf(filepath_factorsF, key='returns')[trade_cols2][start_date : ]
     
     ### 4 生成实例
     # wts = WTS_factor(price, trade_cols)
-    
-    # ### 3 品种指数收益和主力合约收益
-    # retIndex = wts.CLOSE.pct_change().fillna(0)
     
     retIndex = price.loc[(slice(None), 'close'), :].droplevel(1)[trade_cols].pct_change().fillna(0)
     
@@ -838,10 +891,66 @@ def load_local_data(filepath_index, filepath_factorsF, future_info,
         
     return price, retIndex, retMain, cost
 
-def trim_length(retMain, retIndex):
-    temp = pd.DataFrame(1, index=retIndex.index, columns=['temp'])
-    retMain = pd.merge(temp, retMain, how='left', left_index=True, right_index=True)
-    return retMain.iloc[:,1:]
+def load_local_data(filepath_index, filepath_main, future_info, start_date):
+    print('load loca data......')
+    print(f'start_date: {start_date}')
+
+    ### 2 品种指数日数据
+    dfindex = pd.read_csv(filepath_index, index_col=0, parse_dates=True)
+    
+    dfindex.sort_index(inplace=True)
+    
+    dfindex = dfindex[start_date : ]  
+    
+    print(f'index data is updated to {dfindex.index[-1].date()}')
+    
+        
+    dfindex = dfindex.merge(future_info.loc[:, ['point','type','commission']], 
+                            left_on='code', right_index=True)    
+
+    # 手续费
+    dfindex['fee'] = np.where(dfindex['type']==0, dfindex['commission']/dfindex.close/dfindex.point,dfindex['commission'])
+    # 总交易成本（跳空损益+手续费）
+    dfindex['cost'] = dfindex['open'] / dfindex['pre_close'] - 1 + dfindex['fee']
+    
+    # 通过vwap和volume计算amount
+    dfindex['amount'] = dfindex.avg * dfindex.volume
+    # 计算市值
+    dfindex['mkt_value'] = dfindex.close * dfindex.oi * dfindex.point
+    ## 后面几步是为了和之前的数据结构统一
+    dfindex.set_index('code', append=True, inplace=True)
+    # 先把品种放回到列上，然后再把列上olhc字段放到index上。实现较为清晰的数据结构
+    dfindex = dfindex.unstack(1).stack(0) 
+    
+    costIndex = dfindex.loc[(slice(None), 'cost'), :].droplevel(1).shift(-1).fillna(0)
+
+    ### 3 品种主力数据   
+    dfmain = pd.read_csv(f'{filepath_main}main.csv', index_col='date',parse_dates=True)[start_date:]
+    
+    print(f'main data is updated to {dfmain.index[-1].date()}')
+
+    dfmain = dfmain.stack().to_frame('close').reset_index(level=1)
+
+    dfmain = dfmain.merge(future_info.loc[:, ['point','type','commission']], 
+                          left_on=dfmain.columns[0], right_index=True)    
+
+    dfmain['fee'] = np.where(dfmain['type']==0, dfmain['commission']/dfmain.close/dfmain.point, dfmain['commission'])
+    # 总交易成本（跳空损益+手续费）    
+    fee = dfmain[['level_1','fee']].set_index('level_1',append=True).unstack('level_1')
+    
+    fee = fee.stack(0).droplevel(1)
+       
+    retMain = pd.read_csv(f'{filepath_main}retMain.csv', index_col='date',parse_dates=True)[start_date:]
+    
+    dfmainJump = pd.read_csv(f'{filepath_main}retMainJump.csv', index_col='date',parse_dates=True)[start_date:]
+    
+    ### 4 日收益
+    retIndex = dfindex.loc[(slice(None), 'close'), :].droplevel(1).pct_change().fillna(0)
+    
+    ### 5 交易赢损
+    costMain = dfmainJump + fee
+            
+    return dfindex, retIndex, costIndex, dfmain, retMain, costMain
 
 def load_factorPools(filepath_factorPools):
     
@@ -901,3 +1010,35 @@ def get_rebalance_date(filepath_cal_date : str, dateNum: int = 20):
     
     return cal_date
 
+def generate_paramList(factorName, df_factorTable):
+    '''
+    在factorTable中， paramName 和 paramSpace 单元格内数据通过；来隔断
+    
+    load到脚本中为字符串的形式
+    paramName:
+    In : df_factorTable.loc[factorName, 'paramName'].split(';')
+    Out: ['N', 'M', 'hp']
+    
+    相对应每个变量的变量空间也是字符串，但是要声明变量的类型，如range,list
+    paramSpace:
+        
+    In： df_factorTable.loc[factorName, 'paramSpace'].split(';')
+    Out: ['range(10,110,10)', 'range(10,110,20)', 'list((5,10))']   
+    '''
+
+    # load因子参数名称
+    list_paramName = df_factorTable.loc[factorName, 'paramName'].split(';')
+    # load因子参数空间（字符串） 
+    list_paramSpace = df_factorTable.loc[factorName, 'paramSpace'].split(';')
+    # 把因子从字符串形式eval成相对于的类型
+    parameters = [eval(param) for param in list_paramSpace]
+    
+    # 生成参数列表
+    if 'file' in list_paramName[0] or 'path' in list_paramName[0] :
+        # 对量价之外因子的特殊处理
+        parameter_list = [(parameters[0], *x ) for x in list(itertools.product(*parameters[1:])) ]
+        
+    else :
+        parameter_list = list(itertools.product(*parameters))
+    
+    return parameter_list, list_paramName, list_paramSpace

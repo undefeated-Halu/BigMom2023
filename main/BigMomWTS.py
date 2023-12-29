@@ -9,14 +9,8 @@ edition:
 strategyType:
     strategy_factor
 Description: 
-    日频多因子截面，基本面+量价
-TODOs:
-    1 数据构成
-    2 因子构成
-    3 因子测试
-  
+    日频多因子截面 基本面+量价  生成
     
-
 Created on Wed Sep 20 14:39:06 2023
 
 Edited on Wed Sep 20 14:39:06 2023
@@ -35,22 +29,16 @@ path_strategy = f'{root_path}strategy_factor/BigMom2023/'
 
 import pandas as pd
 import numpy as np
-import datetime
 import os
 os.chdir(path_strategy)
 #import time
 import sys
 sys.path.append('D:/Data/factorFunda/')
 sys.path.append(path_lib)
+sys.path.append(f'{path_strategy}main/')
+
 import bottleneck as bn
-from main.FactorCalcFunctions import *
-from main.FactorBaseFunctions import *
-import yaml
-import ctaBasicFunc as cta
-import itertools
-from datetime import datetime
-import matplotlib.pyplot as plt
-import seaborn as sns
+from FactorCalcFunctions import *
 
 class WTS_factor:
     def __init__(self, price, symbol_list):
@@ -1314,10 +1302,57 @@ class WTS_factor:
         return mad
 
     #--- fundamental
-    def alpha_f1(self, file_dir):
-        return pd.read_csv(file_dir, index_col=0, parse_dates=True)
+    def alpha_f1(self, file_dir, N=50 ):
+        'spot_basis'
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return -1 * MEAN(factor, N)
     
+    def alpha_f2(self, file_dir, N=50 ):
+        'main_sub_spread'
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return  MEAN(factor, N)
     
+    def alpha_f3(self, file_dir, N=80 ):
+        'oi_all'
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return factor / MEAN(factor, N) -1
+    
+    def alpha_f4(self, file_dir, N=20 ):
+        'ls_ratio'
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f5(self, file_dir, N=20 ):
+        'ls_ratio5'
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f6(self, file_dir, N=20 ):
+        'ls_ratio10'
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f7(self, file_dir, N=20 ):
+        'ls_ratio_w'
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f8(self, file_dir, N=20 ):
+        'ls_ratio5_w'
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f9(self, file_dir, N=20 ):
+        'ls_ratio10_w'
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return MEAN(factor, N)
+    
+    def alpha_f10(self, file_dir, N=3):
+        'main_sub_spread_diff'
+        factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
+        return DELTA(factor, N)
+    
+"""
 #%% MAIN
 if __name__ == "__main__":
 
@@ -1337,56 +1372,54 @@ if __name__ == "__main__":
     locals().update(pathBank)
     locals().update(pathTest)
     
-    #---  准备工作
+    
     ### 1 基础信息表
-    future_info, trade_cols, list_factor_test,df_factorTable = load_basic_info(filepath_future_list, filepath_factorTable2023)
+    future_info, cols_index, list_factor_test, df_factorTable = load_basic_info(filepath_future_list, filepath_factorTable2023)
     
-    ### 2-5 品种指数日数据
-    # price, retIndex, retMain, cost = load_local_data(filepath_index, filepath_factorsF, future_info, start_date, end_date)
-    price, retIndex, retMain, cost =  load_local_data(filepath_index, filepath_factorsF, future_info, 
-                    trade_cols,start_date, end_date)
+    ### 2 品种日数据
+    dfindex, retIndex, costIndex, dfmain, retMain, costMain = load_local_data(filepath_index, filepath_main, future_info, start_date)
     
+    print(f'index shape: {retIndex.shape}\n')
+    print(f'main shape: {retMain.shape}\n')
     
-    wts = WTS_factor(price, trade_cols)
+    # 修正表头
+    cols_index = list(set(cols_index) & set(retMain.columns))
+    
+    cols_index.sort()
+
+    # 修正长度(以main为基准)
+    if dailyReturnMode is 'main':
+        print('#'*25)
+        print('This factor test is based on main returns!!')
+        print('#'*25)
+        
+        if len(retMain) != len(retIndex):
+            merged = pd.merge(retIndex[['A']], retMain[['A']], how='outer', left_index=True, right_index=True, suffixes=('_retIndex', '_retMain'))
+            print(merged[merged.A_retIndex.isna()])
+            
+        
+        dailyReturn_all = trim_factor(retMain, retIndex, method=0, width=False)
+        cost = trim_factor(costMain, retIndex, method=0, width=False)
+
+    else:
+        dailyReturn_all = retIndex
+        cost = costIndex
+        
+        print('#'*25)
+        print('This factor test is based on index returns!!')
+        print('#'*25)
+        
+    wts = WTS_factor(dfindex, cols_index)
+
     ### 6 结果保存路径
-    # sample_range = f'sample{start_date[:4]}to{end_date}'
     Description = ''
     
-    test_date = 'factorTest_20231114'
-    # test_date = f'''factorTest_{datetime.today().strftime("%Y%m%d")}'''
+    test_date = 'factorTest_2023Dec'
     
     # 输出文件夹
     filepath_test_output = f'{filepath_output}{test_date}{Description}/'
     
     filepath_output_ratios_all = f'{filepath_test_output}performance_ratios{Description}.csv'
-    
-    #--- 测试
-    '''
-    这里用的是全样本测试，
-    示例是用指数收益
-    '''
-    ret = retIndex
-    
-    # 保证收益率和因子的表头一致
-    # 因为retIndex是由CLASS wts生产的，所以是一样的
-    if ret is retMain:
-        if ret.columns is not retIndex.columns:
-            
-            tradeCols = list(set(ret.columns) & set(retIndex.columns))
-            
-            tradeCols.sort()
-            
-            wts = WTS_factor(price, tradeCols)
-            
-            ret = retMain[tradeCols]
-            
-        else:
-            pass
-    else:
-        print('#'*25)
-        print('This factor test is based on index returns!!')
-        print('#'*25)
-    
     
     # 分组测试累计日收益的结果
     dfret = pd.DataFrame()
@@ -1394,46 +1427,19 @@ if __name__ == "__main__":
     dfratio = pd.DataFrame(columns=list_ratios)
     
     
-    '''
-    # demo test
-    wts = WTS_factor(price, trade_cols)
-    
-    i = 206
-    hp = 5
-    N = 60
-    
+    '''    
     factorName = 'alpha_206'
-    factorName = 'alpha_238'
-    '''
+    factorName = 'alpha_f2'
     
-        
+    '''
+    ### 测试
     for factorName in list_factor_test:
-    # for factorName in ['alpha_206']:
+    # for factorName in ['alpha_f1']:
        
         print(factorName)
         
-        '''
-        在factorTable中， paramName 和 paramSpace 单元格内数据通过；来隔断
-        
-        load到脚本中为字符串的形式
-        paramName:
-        In : df_factorTable.loc[factorName, 'paramName'].split(';')
-        Out: ['N', 'M', 'hp']
-        
-        相对应每个变量的变量空间也是字符串，但是要声明变量的类型，如range,list
-        paramSpace:
-            
-        In： df_factorTable.loc[factorName, 'paramSpace'].split(';')
-        Out: ['range(10,110,10)', 'range(10,110,20)', 'list((5,10))']   
-        '''
-        # load因子参数名称
-        list_paramName = df_factorTable.loc[factorName, 'paramName'].split(';')
-        # load因子参数空间（字符串） 
-        list_paramSpace = df_factorTable.loc[factorName, 'paramSpace'].split(';')
-        # 把因子从字符串形式eval成相对于的类型
-        parameters = [eval(param) for param in list_paramSpace]
-        # 生成参数列表
-        parameter_list = list(itertools.product(*parameters))
+        ### 参数组生产
+        parameter_list, list_paramName, list_paramSpace = generate_paramList(factorName, df_factorTable)
         
         # 按照因子保存结果
         filepath_output_factor = f'{filepath_test_output}{factorName}/'
@@ -1444,6 +1450,7 @@ if __name__ == "__main__":
         #单因子测试绩效
         dfratio_factor = pd.DataFrame(columns=list_ratios)
         
+        ### 参数循环
         for param,i  in zip(parameter_list, range(len(parameter_list))):
                  
             # 测试结果保存位置
@@ -1457,26 +1464,29 @@ if __name__ == "__main__":
             factor = eval(f'wts.{factorName}{param[:-1]}')
                           
             if factor is None:
-                print(param, i ,' invalid parameters!')   
+                print(param, i ,' invalid parameters!')
                 
             else:
             #---2 因子处理
+                [factor, _ret, _cost] = trim_factor(factor, retIndex, 0,True, True, dailyReturn_all, cost)
                 # 调用因子处理函数
                 factor = WTS_factor_handle(factor, nsigma=3)
             #---3 截面测试
                 # 有交易费的测试
-                _, _, ratio = factor_test_group(factor, ret, cost, h=hp, factorName=test_name,
+                _, _, ratio = factor_test_group(factor, _ret, _cost, h=hp, factorName=test_name,
                                                 fig=bool_test_fig, fig_path=filepath_fig)
                 
                 # dfratio.loc[test_name,:] = ratio + [factorName] +  [str(param)]
                 dfratio_factor.loc[str(i),:] = [str(param)] + ratio + [factorName]
         
+        ### 绩效保存
         # 单因子测试绩效保存
         dfratio_factor.to_csv(f'{filepath_output_factor}{factorName}_performance_ratios.csv')
+        
         # 汇总合并
         dfratio = pd.concat([dfratio, dfratio_factor], axis=0)
         
-        #---4 因子绩效作图
+        ### 因子绩效作图
         # 先把参数组拆开
         temp = dfratio_factor['parameter'].apply(lambda x : x.strip('()').split(', '))
         
@@ -1513,25 +1523,4 @@ if __name__ == "__main__":
           Performance ratios excel sheet saved 
           @ {filepath_output_ratios_all}''')
 
-
-file_dir = 'D:/Data/tushare/factor/spot_price.csv'
-
-factor = wts.alpha_f1(file_dir)
-
-factor = trim_length(factor, retIndex)
-
-factor.fillna(method='ffill', inplace=True)
-
-cols = list(set(retIndex.columns) & set(factor.columns))
-
-ret = retIndex[cols]
-
-factor = factor[cols]
-
-cost = cost[cols]
-
-factor = WTS_factor_handle(factor, nsigma=3)
-
-_, _, ratio = factor_test_group(factor, ret, cost, h=hp, factorName=test_name,
-                                fig=bool_test_fig, fig_path=filepath_fig)
-
+"""
