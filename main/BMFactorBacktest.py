@@ -133,7 +133,7 @@ factorName = 'alpha_f2'
 
 '''
 ### 测试
-for factorName in list_factor_test[220:]:
+for factorName in list_factor_test:
 # for factorName in ['alpha_f1']:
    
     print(factorName)
