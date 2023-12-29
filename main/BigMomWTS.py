@@ -1318,7 +1318,7 @@ class WTS_factor:
     def alpha_f2(self, file_dir, N=50 ):
         'main_sub_spread'
         factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
-        return -1 * MEAN(factor, N)
+        return  MEAN(factor, N)
     
     def alpha_f3(self, file_dir, N=80 ):
         'oi_all'
