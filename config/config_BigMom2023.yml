@@ -22,26 +22,9 @@ factor_weight:
     groupNum: 5
     date_out: '2023'
 
-test1:
-    # 测试因子名称列表
-    list_factor: ['alpha_216']
-    # 持仓周期列表
-    list_hp: [1, 3, 5, 10, 15, 20]
-    # 因子参数列表
-    list_N: [5, 10, 20, 30, 60, 100]
-    # 绩效结果表头
-    list_ratios: ['ar_15', 'sr_15', 'mdd_15', 'mar_15', 'to_15', 'ar_24', 'sr_24',
-    'mdd_24', 'mar_24', 'to_24','IC_mean', 'ICIR', 'rankIC_mean', 'rankICIR']
-    # 是否作图的标识
-    bool_test_fig: True 
-
 test:
-    # 测试因子名称列表
-    list_factor: ['alpha_216']
-    # 持仓周期列表
-    list_hp: [1, 3, 5, 10, 15, 20]
-    # 因子参数列表
-    list_N: [5, 10, 20, 30, 60, 100]
+
+    dailyReturnMode: 'main'
     # 绩效结果表头
     list_ratios: ['parameter',
     'ar_15_fee', 'sr_15_fee', 'mdd_15_fee', 'mar_15_fee',
@@ -84,24 +67,4 @@ path:
     filepath_templete: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/position_trade/CTA_BigMom.csv'
     
     filepath_tradePosition: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/position_trade/'
-    # ## F相关文件   
-    # #detail: 'f选取因子的权重'
-    # filepath_pick_weight_f: 'output/wight_allocation/weight_pick_F.csv'
-    
-    # filepath_factorTableF: 'dataset/factorTableF.xlsx'   
-      
-    # filepath_factorsF: 'D:/Data/factorFunda/dataset/wts_factors&returns_F.h5'
-
-    # filepath_ratioF: 'output/ratio_factor_sec/perf_ratio_sec_F.xlsx'
-
-    # #detail: 'F策略日收益序列'
-    # filepath_cumretF: 'output/BigMomPVFF/BigMomPVFF_cumret.xlsx'
-    
-    # ## 输出相关文件
-    # filepath_capitalPVF: 'position_trade/BigMomPVFPVF_capital.csv'
-    
-    # filepath_tradePosition: 'position_trade/WTS_PVF/'
-    
-    # filepath_templete: 'position_trade/CTA_BigMom.csv'
-      
     
