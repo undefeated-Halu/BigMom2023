@@ -29,7 +29,6 @@ path_strategy = f'{root_path}strategy_factor/BigMom2023/'
 
 import pandas as pd
 import numpy as np
-import datetime
 import os
 os.chdir(path_strategy)
 #import time
@@ -40,13 +39,6 @@ sys.path.append(f'{path_strategy}main/')
 
 import bottleneck as bn
 from FactorCalcFunctions import *
-from FactorBaseFunctions import *
-import yaml
-import ctaBasicFunc as cta
-import itertools
-from datetime import datetime
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 class WTS_factor:
     def __init__(self, price, symbol_list):
