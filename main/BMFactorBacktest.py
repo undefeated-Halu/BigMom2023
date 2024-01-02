@@ -47,7 +47,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-#%%
+
 '''
 这里会用一个yaml文件作为策略所有参数、路径等信息的配置文件
 '''
@@ -87,7 +87,12 @@ if dailyReturnMode == 'main':
     
     if len(retMain) != len(retIndex):
         merged = pd.merge(retIndex[['A']], retMain[['A']], how='outer', left_index=True, right_index=True, suffixes=('_retIndex', '_retMain'))
-        print(merged[merged.A_retIndex.isna()])
+        diff = merged[merged.A_retIndex.isna()]
+        
+        if diff.shape[0] != 0:
+            diff.to_csv(f'{path_strategy}data_not_mapping.csv')
+            print('data_not_mapping.csv')
+            print(diff)
         
     '''
     收益日序列全用主力数据
@@ -99,6 +104,7 @@ if dailyReturnMode == 'main':
     print('This factor test is based on main returns!!\n')
 
 else:
+    dailyReturnMode = 'index'
     dailyReturn_all = retIndex
     cost = costIndex
     
@@ -109,7 +115,6 @@ print(f'cost({dailyReturnMode}): {cost.shape}\n')
 
 
 
-wts = WTS_factor(dfindex, cols_index)
 
 ### 6 结果保存路径
 Description = dailyReturnMode
@@ -122,7 +127,12 @@ filepath_test_output = f'{filepath_output}{test_date}{Description}/'
 filepath_output_ratios_all = f'{filepath_test_output}performance_ratios{Description}.csv'
 
 
-#%%
+#%% back test
+from BigMomWTS import *
+future_info, cols_index, list_factor_test, df_factorTable = load_basic_info(filepath_future_list, filepath_factorTable2023)
+
+wts = WTS_factor(dfindex, cols_index)
+
 # 分组测试累计日收益的结果
 dfret = pd.DataFrame()
 # 收益绩效统计表
@@ -136,7 +146,7 @@ factorName = 'alpha_f2'
 
 '''
 ### 测试
-for factorName in list_factor_test[229:]:
+for factorName in list_factor_test[-1:]:
 # for factorName in ['alpha_f1']:
    
     print(factorName)
@@ -227,6 +237,6 @@ for factorName in list_factor_test[229:]:
     plt.close()
     
 # 单因子测试绩效保存   
-dfratio.to_csv(f'{filepath_output_ratios_all}')
+# dfratio.to_csv(f'{filepath_output_ratios_all}')
 
-print(f'''{filepath_output_ratios_all}''')
+# print(f'''{filepath_output_ratios_all}''')

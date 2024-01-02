@@ -1300,7 +1300,14 @@ class WTS_factor:
         mad = (ema * 3 - ma * 2) / ma
         mad = mad.diff(5)
         return mad
-
+    
+    def alpha_801(self, N=60):
+        return -MEAN(CORR(self.VOLUME, self.RET, N), int(N/2))
+    
+    def alpha_802(self, N=60):
+        
+        return (RANK(self.RET) + RANK(MEAN(self.VOLUME, N)) + RANK(DELTA(self.RET,2)))
+    
     #--- fundamental
     def alpha_f1(self, file_dir, N=50 ):
         'spot_basis'
@@ -1351,6 +1358,8 @@ class WTS_factor:
         'main_sub_spread_diff'
         factor = pd.read_csv(file_dir, index_col=0, parse_dates=True)
         return DELTA(factor, N)
+    
+    
     
 """
 #%% MAIN
