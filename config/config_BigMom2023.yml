@@ -8,7 +8,7 @@ params:
         # 起始日
         start_date: '2016-01-01'
         # 结束日
-        end_date: '2023-07-13'
+        end_date: '2023-12-31'
 
 weightGenerator:
     maxW: 0.1
@@ -44,7 +44,7 @@ test:
 path:
     filepath_index: 'D:/Data/local_data_daily_update/nj_index_dataset.csv'
     
-    filepath_future_list: 'D:/Data/future_list.csv'
+    filepath_future_list: 'D:/Data/details/future_list.csv'
     
     filepath_mainsub: 'D:/Data/tushare/quote/quote2.csv'
     
@@ -54,13 +54,13 @@ path:
     
     filepath_factorsF: 'D:/Data/tushare/wts_factors&returns_Funda.h5'
     
-    filepath_factorTable2023: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/config/factorTable2023.xlsx'
+    filepath_factorTable2023: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/config/factorTable2023.csv'
     
     filepath_factorPools: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/config/factorPools.xlsx'
     
     filepath_output: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/output/'
     
-    filepath_cal_date: 'D:/Data/cal_date.csv'
+    filepath_cal_date: 'D:/Data/details/cal_date.csv'
     
     filepath_capital: 'D:/ProgramFiles/python/strategy_factor/BigMom2023/config/BigMom2023_capital.csv'
     

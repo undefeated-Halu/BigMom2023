@@ -791,14 +791,14 @@ def load_config(filepath='config/config_BigMom2023.yml'):
 def load_basic_info(filepath_future_list, filepath_factorTable2023, method='trade'):
     ### 1 基础信息表
     # 期货列表，基础信息表
-    future_info = pd.read_csv(filepath_future_list,index_col=0)
+    future_info = pd.read_csv(filepath_future_list,index_col=0,encoding="GB18030")
     
     # F和PV都交易的品种，基础信息表里用tradeF列标识
     trade_cols = future_info[future_info[method].fillna(False)].index.tolist()
     trade_cols.sort()
     
     # BigMom2023的factorTable
-    df_factorTable = pd.read_excel(filepath_factorTable2023, index_col=0)
+    df_factorTable = pd.read_csv(filepath_factorTable2023, index_col=0)
     
     list_factor_test = df_factorTable[df_factorTable.tag_test == 1].index.tolist()
     

@@ -69,9 +69,10 @@ locals().update(pathTest)
 future_info, cols_index, list_factor_test, df_factorTable = load_basic_info(filepath_future_list, filepath_factorTable2023)
 
 
-
 ### 2 品种日数据
 dfindex, retIndex, costIndex, dfmain, retMain, costMain = load_local_data(filepath_index, filepath_main, future_info, start_date)
+
+retIndex =  retIndex[cols_index]
 
 print(f'index shape: {retIndex.shape}\n')
 print(f'main shape: {retMain.shape}\n')
@@ -83,9 +84,6 @@ cols_index.sort()
 
 # 修正长度(以main为基准)
 if dailyReturnMode == 'main':
-    print('#'*25)
-    print('This factor test is based on main returns!!')
-    print('#'*25)
     
     if len(retMain) != len(retIndex):
         merged = pd.merge(retIndex[['A']], retMain[['A']], how='outer', left_index=True, right_index=True, suffixes=('_retIndex', '_retMain'))
@@ -96,22 +94,27 @@ if dailyReturnMode == 'main':
     但是，基本面数据比较难补，
     还是以指数数据长度为准
     '''
-    [dailyReturn_all, cost] = trimShape(retIndex, 0, True,False, retMain, costMain)
+    [dailyReturn_all, cost] = trimShape(retIndex[cols_index], 0, True,True, retMain, costMain)
+    
+    print('This factor test is based on main returns!!\n')
 
 else:
     dailyReturn_all = retIndex
     cost = costIndex
     
-    print('#'*25)
-    print('This factor test is based on index returns!!')
-    print('#'*25)
-    
+    print('This factor test is based on index returns!!\n')
+
+print(f'dailyReturn_all({dailyReturnMode}): {dailyReturn_all.shape}\n')
+print(f'cost({dailyReturnMode}): {cost.shape}\n')
+
+
+
 wts = WTS_factor(dfindex, cols_index)
 
 ### 6 结果保存路径
 Description = dailyReturnMode
 
-test_date = 'factorTest_2023Dec'
+test_date = 'factorTest_2023Dec_'
 
 # 输出文件夹
 filepath_test_output = f'{filepath_output}{test_date}{Description}/'
@@ -133,7 +136,7 @@ factorName = 'alpha_f2'
 
 '''
 ### 测试
-for factorName in list_factor_test:
+for factorName in list_factor_test[229:]:
 # for factorName in ['alpha_f1']:
    
     print(factorName)
@@ -170,11 +173,11 @@ for factorName in list_factor_test:
         #---2 因子处理
             '''
             2.03 ms ± 43.2 µs per loop (mean ± std. dev. of 7 runs, 1000 loops each)
-            '''
-            [_ret, _cost] = trimShape(factor, 0,True, True, dailyReturn_all, cost)
-            
-            if factor.shape != _ret.shape:
-                [factor] = trimShape(_ret, 0,True, True, factor)
+            '''            
+            if factor.shape != dailyReturn_all.shape:
+                [factor] = trimShape(retIndex, 'ffill', True, True, factor)
+                
+            [_ret, _cost] = trimShape(factor, 0 ,True, True, dailyReturn_all, cost)
             
             # 调用因子处理函数
             factor = WTS_factor_handle(factor, nsigma=3)
@@ -226,6 +229,4 @@ for factorName in list_factor_test:
 # 单因子测试绩效保存   
 dfratio.to_csv(f'{filepath_output_ratios_all}')
 
-print(f'''
-      Performance ratios excel sheet saved 
-      @ {filepath_output_ratios_all}''')
+print(f'''{filepath_output_ratios_all}''')
